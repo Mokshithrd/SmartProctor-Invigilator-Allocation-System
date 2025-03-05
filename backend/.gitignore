@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+
+# Environment variables
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+
+# Logs & Debugging files
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+debug.log
+logs/
+*.log
+
+# Database files
+*.sqlite
+*.sqlite3
+*.db
+
+# Build artifacts
+dist/
+build/
+
+# Temporary files
+.tmp/
+.cache/
