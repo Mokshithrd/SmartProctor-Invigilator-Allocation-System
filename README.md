@@ -7,7 +7,7 @@
 - npm install
 
 ## Client
-- cd ../client
+- cd client
 - npm install
 
 
