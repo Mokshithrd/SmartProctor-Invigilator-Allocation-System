@@ -1,19 +1,20 @@
-# faculty-student-allocation-for-examination
+# Exam Allocation System
 
-- react+tailwind 
+## MERN + Tailwind
 
-# Backend
-cd backend
-npm install
-
-# Client
-cd ../client
-npm install
-
-
-# Run backend and frontend in different terminals
 ## Backend
-npm run dev
+- cd backend
+- npm install
 
 ## Client
-npm start
+- cd ../client
+- npm install
+
+
+## Run backend and frontend in different terminals
+
+### Backend
+- npm run dev
+
+### Client
+- npm start
