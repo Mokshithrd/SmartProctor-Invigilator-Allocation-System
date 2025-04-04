@@ -1,23 +1,45 @@
-const express = require("express");
-const cors = require("cors");
-const dotenv = require("dotenv");
-const mongoose = require("mongoose");
-
-dotenv.config();
+const express = require('express');
 const app = express();
-app.use(cors());
+const cookieParser = require('cookie-parser');
+const cors = require("cors");
+const PORT = process.env.PORT || 4000;
+
+require('dotenv').config();
+
+const dbConnect = require("./config/db");
+dbConnect();
+
 app.use(express.json());
+app.use(cookieParser());
+app.use(cors({
+    origin: "http://localhost:3000", // Change to frontend URL
+    credentials: true,
+}));
 
-// MongoDB Connection
-const mongoURI = process.env.MONGO_URI; // Get from .env
 
-mongoose
-  .connect(mongoURI, { useNewUrlParser: true, useUnifiedTopology: true })
-  .then(() => console.log("MongoDB Connected!"))
-  .catch((err) => console.error("MongoDB Connection Error:", err));
+const userRoute = require("./routes/userRoute");
+const facultyRoute = require("./routes/facultyRoute")
+const adminRoute = require("./routes/adminRoutes");
+const roomRoutes = require('./routes/roomRoutes');
 
-app.get("/", (req, res) => res.send("API Running..."));
+// const subjectRoute = require('./routes/subjectRoutes');
+const examRoutes = require("./routes/examRoutes");
+// const insert = require("./init/insertData");
+// insert();
 
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+app.use("/auth",userRoute);
+app.use("/admin", adminRoute);
+app.use("/faculty", facultyRoute);
+app.use("/room", roomRoutes);
 
+// app.use("/subject",subjectRoute);
+app.use("/exams", examRoutes);
+
+
+app.get("/",(req,res)=>{
+    res.send("Home route");
+});
+
+app.listen(PORT ,()=>{
+    console.log(`App listening to port ${PORT}`);
+});

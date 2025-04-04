@@ -1,30 +1,23 @@
-# Dependencies
-node_modules/
 
-# Environment variables
-.env
+# dependencies
+/node_modules
+/.pnp
+.pnp.js
+
+# testing
+/coverage
+
+# production
+/build
+
+# misc
+.DS_Store
 .env.local
-.env.development
-.env.test
-.env.production
+.env.development.local
+.env.test.local
+.env.production.local
+.env
 
-# Logs & Debugging files
 npm-debug.log*
 yarn-debug.log*
-pnpm-debug.log*
-debug.log
-logs/
-*.log
-
-# Database files
-*.sqlite
-*.sqlite3
-*.db
-
-# Build artifacts
-dist/
-build/
-
-# Temporary files
-.tmp/
-.cache/
+yarn-error.log*
