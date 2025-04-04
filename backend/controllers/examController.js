@@ -27,6 +27,32 @@ exports.createExam = async (req, res) => {
             }
         }
 
+        // ✅ Check for overlapping subjects on the same date
+        for (let i = 0; i < subjects.length; i++) {
+            for (let j = i + 1; j < subjects.length; j++) {
+                const s1 = subjects[i];
+                const s2 = subjects[j];
+                // console.log(s1);
+                // console.log(s2);
+                
+                if (s1.date === s2.date) {
+                    const s1Start = moment(s1.startTime, ["h:mm A", "HH:mm"]);
+                    const s1End = moment(s1.endTime, ["h:mm A", "HH:mm"]);
+                    const s2Start = moment(s2.startTime, ["h:mm A", "HH:mm"]);
+                    const s2End = moment(s2.endTime, ["h:mm A", "HH:mm"]);
+
+                    const isOverlap = s1Start.isBefore(s2End) && s2Start.isBefore(s1End);
+
+                    if (isOverlap) {
+                        return res.status(400).json({
+                            success: false,
+                            message: `Subjects ${s1.name} and ${s2.name} have overlapping time on ${s1.date}.`
+                        });
+                    }
+                }
+            }
+        }
+
         const selectedRooms = await Room.find({ _id: { $in: rooms } });
         if (selectedRooms.length === 0) {
             return res.status(400).json({ success: false, message: "Invalid room selection." });
