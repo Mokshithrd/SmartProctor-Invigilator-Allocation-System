@@ -8,51 +8,37 @@ const moment = require("moment");
 exports.createExam = async (req, res) => {
     const session = await mongoose.startSession();
     session.startTransaction();
+
     try {
         const { name, semester, year, totalStudents, rooms, faculty, subjects } = req.body;
 
-        // Validate required fields
-        if (!name || !semester || !year || !totalStudents || 
+        // Validate inputs
+        if (!name || !semester || !year || !totalStudents ||
             !Array.isArray(rooms) || rooms.length === 0 ||
             !Array.isArray(faculty) || faculty.length === 0 ||
-            !Array.isArray(subjects) || subjects.length === 0) {
+            !Array.isArray(subjects) || subjects.length === 0
+        ) {
             return res.status(400).json({ success: false, message: "All fields are required." });
         }
 
-        // Validate subject details
         for (let subject of subjects) {
             if (!subject.name || !subject.subjectCode || !subject.date || !subject.startTime || !subject.endTime) {
-                return res.status(400).json({ success: false, message: "Each subject must have a Name, Subject Code, Date, Start time and End time." });
+                return res.status(400).json({ success: false, message: "Each subject must have a name, subject code, date, start time, and end time." });
             }
         }
 
-        // Fetch selected rooms from DB
         const selectedRooms = await Room.find({ _id: { $in: rooms } });
-
         if (selectedRooms.length === 0) {
             return res.status(400).json({ success: false, message: "Invalid room selection." });
         }
 
-        // Validate total room capacity
-        const totalCapacity = selectedRooms.reduce((sum, room) => sum + (room.totalBenches * 2), 0);
-        if (totalCapacity < totalStudents) {
-            return res.status(400).json({
-                success: false,
-                message: `Selected rooms can only accommodate ${totalCapacity} students, but total students are ${totalStudents}.`
-            });
-        }
-
-        // Validate faculty count (Faculty >= Number of Rooms)
         if (faculty.length < selectedRooms.length) {
-            return res.status(400).json({
-                success: false,
-                message: `At least ${selectedRooms.length} faculty members are required for ${selectedRooms.length} rooms, but only ${faculty.length} provided.`
-            });
+            return res.status(400).json({ success: false, message: `At least ${selectedRooms.length} faculty members are required.` });
         }
 
-        // Step 1: Check room availability for all subjects before proceeding
+        // Step 1: Check availability of all subjects first
         for (let subject of subjects) {
-            const conflict = await RoomAllocator.checkRoomAvailability(rooms, subject.date, subject.startTime, subject.endTime);
+            const conflict = await RoomAllocator.checkRoomAvailability(rooms, subject.date, subject.startTime, subject.endTime, totalStudents);
             if (!conflict.success) {
                 await session.abortTransaction();
                 session.endSession();
@@ -60,20 +46,20 @@ exports.createExam = async (req, res) => {
             }
         }
 
-        // Step 2: Create Exam Record
+        // Step 2: Create Exam
         const newExam = new Exam({
             name,
             semester,
             year,
             totalStudents,
-            rooms: [], // Initially empty, will be updated after room allocation
+            rooms: [],
             faculty,
             subjects: []
         });
 
         await newExam.save({ session });
 
-        // Step 3: Create Subjects
+        // Step 3: Create Subject documents
         const subjectDocs = await Subject.insertMany(
             subjects.map(sub => ({
                 exam: newExam._id,
@@ -86,8 +72,9 @@ exports.createExam = async (req, res) => {
             { session }
         );
 
-        // Step 4: Allocate Students to Rooms for Each Subject
-        let allocatedRooms = new Set();
+        let allocatedRoomIds = new Set();
+
+        // Step 4: Allocate students for each subject
         for (let subject of subjectDocs) {
             const allocationResult = await RoomAllocator.allocateStudentsToRooms(
                 newExam._id,
@@ -95,7 +82,8 @@ exports.createExam = async (req, res) => {
                 rooms,
                 subject.date,
                 subject.startTime,
-                subject.endTime
+                subject.endTime,
+                session 
             );
 
             if (!allocationResult.success) {
@@ -104,12 +92,12 @@ exports.createExam = async (req, res) => {
                 return res.status(400).json(allocationResult);
             }
 
-            allocationResult.allocations.forEach(allocation => allocatedRooms.add(allocation.roomId.toString()));
+            allocationResult.allocations.forEach(allocation => allocatedRoomIds.add(allocation.roomId.toString()));
         }
 
-        // Step 5: Update Exam with Subject IDs and Allocated Room IDs
-        newExam.subjects = subjectDocs.map(sub => sub._id);
-        newExam.rooms = Array.from(allocatedRooms); // Only store allocated rooms
+        // Step 5: Update Exam doc
+        newExam.subjects = subjectDocs.map(s => s._id);
+        newExam.rooms = Array.from(allocatedRoomIds);
         await newExam.save({ session });
 
         await session.commitTransaction();
@@ -120,10 +108,10 @@ exports.createExam = async (req, res) => {
             message: "Exam created successfully!",
             exam: newExam
         });
-    } catch (error) {
+    } catch (err) {
         await session.abortTransaction();
         session.endSession();
-        console.error("Error creating exam:", error);
+        console.error("Error creating exam:", err);
         res.status(500).json({ success: false, message: "Internal Server Error" });
     }
 };

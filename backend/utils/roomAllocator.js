@@ -2,72 +2,140 @@ const Room = require("../models/Room");
 const RoomAllocation = require("../models/RoomAllocation");
 const moment = require("moment");
 
-// Function to check room availability before allocation
-exports.checkRoomAvailability = async (selectedRoomIds, examDate, startTime, endTime) => {
+exports.checkRoomAvailability = async (selectedRoomIds, examDate, startTime, endTime, totalStudents) => {
     try {
-        const formattedExamDate = moment(examDate, "YYYY-MM-DD").startOf("day").toISOString();
-        const formattedStartTime = moment(startTime, ["h:mm A", "HH:mm"]).format("HH:mm");
-        const formattedEndTime = moment(endTime, ["h:mm A", "HH:mm"]).format("HH:mm");
+        const date = moment(examDate, "YYYY-MM-DD").startOf("day").toDate();
+        const formattedStart = moment(startTime, ["h:mm A", "HH:mm"]).format("HH:mm");
+        const formattedEnd = moment(endTime, ["h:mm A", "HH:mm"]).format("HH:mm");
 
-        // Check for existing allocations that overlap in the selected rooms
+        // Fetch selected rooms
+        const selectedRooms = await Room.find({ _id: { $in: selectedRoomIds } });
+
+        // Fetch existing allocations for the same date/time
         const existingAllocations = await RoomAllocation.find({
             roomId: { $in: selectedRoomIds },
-            date: formattedExamDate,
+            date,
             $or: [
-                { startTime: { $lt: formattedEndTime }, endTime: { $gt: formattedStartTime } }
+                { startTime: { $lt: formattedEnd }, endTime: { $gt: formattedStart } }
             ]
         });
 
-        if (existingAllocations.length > 0) {
-            const conflictedRoom = existingAllocations[0].roomNumber;
+        const usedCapacityMap = {};
+        existingAllocations.forEach(alloc => {
+            const roomIdStr = alloc.roomId.toString();
+            usedCapacityMap[roomIdStr] = (usedCapacityMap[roomIdStr] || 0) + alloc.students.length;
+        });
+
+        // Calculate total available capacity
+        let totalAvailable = 0;
+
+        for (let room of selectedRooms) {
+            const roomIdStr = room._id.toString();
+            const used = usedCapacityMap[roomIdStr] || 0;
+            const remaining = Math.max(0, room.capacity - used);
+            totalAvailable += remaining;
+        }
+
+        if (totalAvailable < totalStudents) {
             return {
                 success: false,
-                message: `Room ${conflictedRoom} is already allocated on ${examDate} between ${startTime} and ${endTime}.`
+                message: `Insufficient total capacity for selected rooms on ${examDate} between ${startTime} and ${endTime}. Available: ${totalAvailable}, Required: ${totalStudents}`
             };
         }
 
-        return { success: true };
+        return {
+            success: true,
+            availableSeats: totalAvailable,
+            message: `Sufficient capacity available for selected rooms.`
+        };
+
     } catch (err) {
-        console.error("Error checking room availability:", err);
+        console.error("Room availability check error:", err);
         return { success: false, message: "Internal Server Error" };
     }
 };
 
-exports.allocateStudentsToRooms = async (examId, totalStudents, selectedRoomIds, examDate, startTime, endTime) => {
+exports.allocateStudentsToRooms = async (examId, totalStudents, selectedRoomIds, examDate, startTime, endTime, session) => {
     try {
-        const selectedRooms = await Room.find({ _id: { $in: selectedRoomIds } });
-        let studentIndex = 1;
+        console.log("examDate = ",examDate);
+        const date = moment(examDate, "YYYY-MM-DD").startOf("day").toDate();
+        console.log("date = ",date);
+        const formattedStart = moment(startTime, ["h:mm A", "HH:mm"]).format("HH:mm");
+        const formattedEnd = moment(endTime, ["h:mm A", "HH:mm"]).format("HH:mm");
+
         let allocations = [];
+        let studentIndex = 1;
 
-        const formattedExamDate = moment(examDate, "YYYY-MM-DD").startOf("day").toISOString();
-        const formattedStartTime = moment(startTime, ["h:mm A", "HH:mm"]).format("HH:mm");
-        const formattedEndTime = moment(endTime, ["h:mm A", "HH:mm"]).format("HH:mm");
+        // Step 1: Find existing allocations (partially used)
+        const existingAllocations = await RoomAllocation.find({
+            roomId: { $in: selectedRoomIds },
+            date,
+            startTime: formattedStart,
+            endTime: formattedEnd
+        });
 
-        for (let room of selectedRooms) {
-            const assignedCount = Math.min(room.totalBenches * 2, totalStudents);
-            if (assignedCount === 0) break;
+        const usedRoomIds = existingAllocations.map(a => a.roomId.toString());
+        const roomUsageMap = {};
 
-            const allocation = new RoomAllocation({
+        existingAllocations.forEach(a => {
+            const roomId = a.roomId.toString();
+            const assigned = a.students.length;
+            roomUsageMap[roomId] = (roomUsageMap[roomId] || 0) + assigned;
+            console.log("roomUsageMap[roomId] = ",roomUsageMap[roomId]);
+        });
+
+        const allRooms = await Room.find({ _id: { $in: selectedRoomIds } });
+        const sortedRooms = allRooms.sort((a, b) => b.capacity - a.capacity);
+
+        for (let room of sortedRooms) {
+            const roomIdStr = room._id.toString();
+            let availableSeats;
+
+            if (usedRoomIds.includes(roomIdStr)) {
+                availableSeats = room.capacity - (roomUsageMap[roomIdStr] || 0);
+            } else {
+                availableSeats = room.capacity;
+            }
+
+            if (availableSeats <= 0) continue;
+
+            const assignCount = Math.min(totalStudents, availableSeats);
+            if (assignCount === 0) continue;
+
+            const students = Array.from({ length: assignCount }, (_, i) => `Student ${studentIndex + i}`);
+
+            const newAllocation = new RoomAllocation({
                 examId,
                 roomId: room._id,
                 roomNumber: room.roomNumber,
-                students: Array.from({ length: assignedCount }, (_, i) => `Student ${studentIndex + i}`),
-                date: formattedExamDate,
-                startTime: formattedStartTime,
-                endTime: formattedEndTime
+                students,
+                date,
+                startTime: formattedStart,
+                endTime: formattedEnd
             });
 
-            await allocation.save();
-            allocations.push(allocation);
+            await newAllocation.save({ session });
+            allocations.push(newAllocation);
 
-            studentIndex += assignedCount;
-            totalStudents -= assignedCount;
+            studentIndex += assignCount;
+            totalStudents -= assignCount;
             if (totalStudents <= 0) break;
         }
 
-        return { success: true, message: "Rooms allocated successfully.", allocations };
+        if (totalStudents > 0) {
+            return {
+                success: false,
+                message: `Insufficient capacity for students at ${examDate} ${startTime} - ${endTime}.`
+            };
+        }
+
+        return {
+            success: true,
+            message: "Room allocation successful",
+            allocations
+        };
     } catch (err) {
-        console.error("Error in room allocation:", err);
+        console.error("Allocation error:", err);
         return { success: false, message: "Internal Server Error" };
     }
 };
