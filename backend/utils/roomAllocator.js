@@ -1,12 +1,16 @@
 const Room = require("../models/Room");
 const RoomAllocation = require("../models/RoomAllocation");
-const moment = require("moment");
+const moment = require("moment-timezone");
 
 exports.checkRoomAvailability = async (selectedRoomIds, examDate, startTime, endTime, totalStudents) => {
     try {
-        const date = moment(examDate, "YYYY-MM-DD").startOf("day").toDate();
+        const date = moment.tz(examDate, "YYYY-MM-DD", "Asia/Kolkata").startOf("day").toDate();
         const formattedStart = moment(startTime, ["h:mm A", "HH:mm"]).format("HH:mm");
         const formattedEnd = moment(endTime, ["h:mm A", "HH:mm"]).format("HH:mm");
+        // console.log("▶ Exam Date (Raw):", examDate);
+        // console.log("▶ Parsed Local Date:", moment.tz(examDate, "Asia/Kolkata").format());
+        // console.log("▶ Stored Date (UTC):", date);
+
 
         // Fetch selected rooms
         const selectedRooms = await Room.find({ _id: { $in: selectedRoomIds } });
@@ -36,6 +40,9 @@ exports.checkRoomAvailability = async (selectedRoomIds, examDate, startTime, end
             totalAvailable += remaining;
         }
 
+        // console.log("Total available seats:", totalAvailable);
+        // console.log("Total students to allocate:", totalStudents);
+
         if (totalAvailable < totalStudents) {
             return {
                 success: false,
@@ -55,13 +62,14 @@ exports.checkRoomAvailability = async (selectedRoomIds, examDate, startTime, end
     }
 };
 
-exports.allocateStudentsToRooms = async (examId, totalStudents, selectedRoomIds, examDate, startTime, endTime, session) => {
+exports.allocateStudentsToRooms = async (examId, subjectId, totalStudents, selectedRoomIds, examDate, startTime, endTime, session) => {
     try {
-        console.log("examDate = ",examDate);
-        const date = moment(examDate, "YYYY-MM-DD").startOf("day").toDate();
-        console.log("date = ",date);
+        const date = moment.tz(examDate, "YYYY-MM-DD", "Asia/Kolkata").startOf("day").toDate();
         const formattedStart = moment(startTime, ["h:mm A", "HH:mm"]).format("HH:mm");
         const formattedEnd = moment(endTime, ["h:mm A", "HH:mm"]).format("HH:mm");
+        // console.log("▶ Exam Date (Raw):", examDate);
+        // console.log("▶ Parsed Local Date:", moment.tz(examDate, "Asia/Kolkata").format());
+        // console.log("▶ Stored Date (UTC):", date);
 
         let allocations = [];
         let studentIndex = 1;
@@ -81,7 +89,7 @@ exports.allocateStudentsToRooms = async (examId, totalStudents, selectedRoomIds,
             const roomId = a.roomId.toString();
             const assigned = a.students.length;
             roomUsageMap[roomId] = (roomUsageMap[roomId] || 0) + assigned;
-            console.log("roomUsageMap[roomId] = ",roomUsageMap[roomId]);
+            // console.log("roomUsageMap[roomId] = ",roomUsageMap[roomId]);
         });
 
         const allRooms = await Room.find({ _id: { $in: selectedRoomIds } });
@@ -106,6 +114,7 @@ exports.allocateStudentsToRooms = async (examId, totalStudents, selectedRoomIds,
 
             const newAllocation = new RoomAllocation({
                 examId,
+                subjectId,
                 roomId: room._id,
                 roomNumber: room.roomNumber,
                 students,

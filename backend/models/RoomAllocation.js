@@ -4,6 +4,7 @@ const roomAllocationSchema = new mongoose.Schema({
     examId: { type: mongoose.Schema.Types.ObjectId, ref: "Exam", required: true },
     roomId: { type: mongoose.Schema.Types.ObjectId, ref: "Room", required: true },
     roomNumber: { type: String, required: true },
+    subjectId: { type: mongoose.Schema.Types.ObjectId, ref: 'Subject', required: true },
     students: { type: [String], required: true },
     date: { type: Date, required: true }, // Ensure we store the date
     startTime: { type: String, required: true },

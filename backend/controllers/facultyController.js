@@ -3,6 +3,20 @@ const bcrypt = require("bcrypt");
 const crypto = require("crypto");
 const sendEmail = require("../utils/sendEmail");
 const Allocation = require("../models/Allocation");
+const Exam = require("../models/Exam");
+const Subject = require("../models/Subject");
+const Room = require("../models/Room");
+
+const formatTime12Hour = (timeStr) => {
+    const [hour, minute] = timeStr.split(":");
+    const date = new Date();
+    date.setHours(hour, minute);
+    return date.toLocaleTimeString("en-US", {
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: true,
+    });
+};
 
 // Add Faculty - Admin only
 exports.addFaculty = async (req, res) => {
@@ -123,19 +137,92 @@ exports.updateOwnProfile = async (req, res) => {
 };
 
 exports.getFacultyDashboardData = async (req, res) => {
+    const facultyId = req.user.id;
+
     try {
-        const facultyId = req.user.id;
-        const upcomingAllocations = await Allocation.find({
-            faculty: facultyId,
-            date: { $gte: new Date() }
-        }).sort({ date: 1 });
+        const now = new Date();
+        const todayDateString = now.toISOString().split("T")[0]; // "YYYY-MM-DD"
+
+        const allocations = await Allocation.find({ facultyId })
+            .populate("examId", "name")
+            .populate("roomId", "roomNumber building floor");
+
+        const upcoming = [];
+        const present = [];
+        const completed = [];
+
+        allocations.forEach(allocation => {
+            const allocationDate = new Date(allocation.date);
+            const allocationDateString = allocationDate.toISOString().split("T")[0];
+
+            const startTimeFormatted = formatTime12Hour(allocation.startTime);
+            const endTimeFormatted = formatTime12Hour(allocation.endTime);
+
+            const data = {
+                examName: allocation.examId.name,
+                date: allocationDateString,
+                startTime: startTimeFormatted,
+                endTime: endTimeFormatted,
+                room: {
+                    number: allocation.roomId.roomNumber,
+                    building: allocation.roomId.building,
+                    floor: allocation.roomId.floor,
+                }
+            };
+
+            if (allocationDateString === todayDateString) {
+                present.push(data);
+            } else if (allocationDate > now) {
+                upcoming.push(data);
+            } else {
+                completed.push(data);
+            }
+        });
 
         res.status(200).json({
             success: true,
-            data: upcomingAllocations
+            upcoming,
+            present,
+            completed,
         });
-    } catch (err) {
-        console.error("Faculty Dashboard Error:", err);
-        res.status(500).json({ success: false, message: "Failed to fetch dashboard data" });
+    } catch (error) {
+        console.error("Error fetching faculty dashboard:", error);
+        res.status(500).json({ success: false, message: "Internal server error" });
+    }
+};
+
+// Get all previous allocation of a faculty
+exports.getFacultyAllocations = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const faculty = await User.findById(id);
+        if (!faculty) {
+            return res.status(404).json({ success: false, message: "Faculty not found" });
+        }
+
+        const allocations = await Allocation.find({ facultyId: id })
+            .populate("examId", "name")
+            .populate("subjectId", "name")
+            .populate("roomId", "roomNumber")
+            .sort({ date: -1 }); // optional: latest first
+
+        const response = {
+            facultyName: faculty.name,
+            designation: faculty.designation,
+            allocations: allocations.map(alloc => ({
+                examName: alloc.examId?.name,
+                subjectName: alloc.subjectId?.name,
+                roomNumber: alloc.roomId?.roomNumber,
+                date: alloc.date,
+                startTime: alloc.startTime,
+                endTime: alloc.endTime
+            }))
+        };
+
+        return res.status(200).json({ success: true, data: response });
+    } catch (error) {
+        console.error("Error fetching faculty allocations:", error);
+        return res.status(500).json({ success: false, message: "Internal Server Error" });
     }
 };

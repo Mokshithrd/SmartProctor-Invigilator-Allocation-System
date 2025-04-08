@@ -7,7 +7,8 @@ const allocationSchema = new mongoose.Schema({
     facultyId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true }, // Invigilator
     facultyName: { type: String, required: true },
     date: { type: Date, required: true },
-    time: { type: String, required: true }
+    startTime: { type: String, required: true }, // Exam Start Time (e.g., "10:00 AM")
+    endTime: { type: String, required: true } 
 }, { timestamps: true });
 
 module.exports = mongoose.model("Allocation", allocationSchema);

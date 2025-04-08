@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { auth, isAdmin, isFaculty } = require("../middleware/authMiddleware");
-const {addFaculty, getAllFaculties, deleteFaculty,updateOwnProfile, getFacultyById} = require("../controllers/facultyController");
+const {addFaculty, getAllFaculties, deleteFaculty,updateOwnProfile, getFacultyById, getFacultyAllocations} = require("../controllers/facultyController");
 // const { getFacultyDashboardData } = require("../controllers/facultyController");
 const {getFacultyDashboardData} = require("../controllers/facultyController")
 
@@ -19,6 +19,8 @@ router.get("/dashboard", auth, isFaculty, getFacultyDashboardData);
 
 // Admin routes
 router.get("/:id", auth, isAdmin, getFacultyById);
+
+router.get("/allocations/:id", auth, isAdmin, getFacultyAllocations);
 
 
 module.exports = router;
