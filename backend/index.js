@@ -24,6 +24,7 @@ const roomRoutes = require('./routes/roomRoutes');
 
 // const subjectRoute = require('./routes/subjectRoutes');
 const examRoutes = require("./routes/examRoutes");
+const pdfRoutes = require('./routes/pdfRoutes');
 // const insert = require("./init/insertData");
 // insert();
 
@@ -34,6 +35,7 @@ app.use("/room", roomRoutes);
 
 // app.use("/subject",subjectRoute);
 app.use("/exams", examRoutes);
+app.use("/pdf", pdfRoutes);
 
 
 app.get("/",(req,res)=>{

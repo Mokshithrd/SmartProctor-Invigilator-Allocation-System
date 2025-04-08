@@ -63,7 +63,7 @@ exports.sendFacultyEmailsForExam = async (req, res) => {
                 text += `${i + 1}. Date: ${a.date.toDateString()}\n   Time: ${formattedStart} - ${formattedEnd}\n   Room: ${a.room.building}, ${a.room.roomNumber}, ${a.room.floor}\n\n`;
             });
 
-            text += "Please be present at your assigned room 15 minutes before the scheduled time.\n\nRegards,\nExam Cell";
+            text += "Please be present at your assigned room 10 minutes before the scheduled time.\n\nRegards,\nExam Cell";
 
             return sendEmail(email, `Invigilation Details for ${exam.name}`, text);
         });

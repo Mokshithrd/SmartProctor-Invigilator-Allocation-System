@@ -155,7 +155,7 @@ exports.createExam = async (req, res) => {
             ...new Set(facultyResult.allocations.map(a => a.facultyId.toString()))
         ];
         newExam.faculty = uniqueFacultyIds;
-        await newExam.save({ session });        
+        await newExam.save({ session });
 
         await session.commitTransaction();
         session.endSession();
@@ -301,86 +301,102 @@ exports.getAllExams = async (req, res) => {
 
 exports.getExamById = async (req, res) => {
     const { id } = req.params;
-  
-    try {
-      const exam = await Exam.findById(id)
-        .populate("rooms", "roomNumber building floor")
-        .populate("faculty", "name email")
-        .populate("subjects");
-  
-      if (!exam) {
-        return res.status(404).json({ success: false, message: "Exam not found" });
-      }
-  
-      // Rooms used
-      const roomsUsed = exam.rooms.map(room => ({
-        building: room.building,
-        roomNumber: room.roomNumber,
-        floor: room.floor
-      }));
-  
-      // Faculty names
-      const facultyNames = exam.faculty.map(fac => fac.name);
-  
-      // Rooms allotted to students
-      const roomAllocations = await RoomAllocation.find({ examId: id }).populate("roomId");
 
-      const seenRooms = new Set();
-      const studentRoomAllotments = [];
-      
-      roomAllocations.forEach(alloc => {
-        const room = alloc.roomId;
-        const roomKey = `${room._id}`; // Or use `${room.building}-${room.roomNumber}-${room.floor}` if needed
-      
-        if (!seenRooms.has(roomKey)) {
-          seenRooms.add(roomKey);
-          const studentCount = alloc.students.length;
-      
-          studentRoomAllotments.push({
-            studentRange: `1 - ${studentCount}`, // You can customize logic here if needed
-            count: studentCount,
-            room: {
-              building: room.building,
-              roomNumber: room.roomNumber,
-              floor: room.floor
+    try {
+        const exam = await Exam.findById(id)
+            .populate("rooms", "roomNumber building floor")
+            .populate("faculty", "name email")
+            .populate("subjects");
+
+        if (!exam) {
+            return res.status(404).json({ success: false, message: "Exam not found" });
+        }
+
+        // Rooms used
+        const roomsUsed = exam.rooms.map(room => ({
+            building: room.building,
+            roomNumber: room.roomNumber,
+            floor: room.floor
+        }));
+
+        // Faculty names
+        const facultyNames = exam.faculty.map(fac => fac.name);
+
+        // Rooms allotted to students
+        const roomAllocations = await RoomAllocation.find({ examId: id }).populate("roomId");
+
+        const seenRooms = new Set();
+        const studentRoomAllotments = [];
+
+        roomAllocations.forEach((alloc) => {
+            const room = alloc.roomId;
+            const roomKey = `${room._id}`;
+
+            if (!seenRooms.has(roomKey)) {
+                seenRooms.add(roomKey);
+
+                const rollNumbers = alloc.students
+                    .map(s => {
+                        const match = s.match(/\d+/); // Extract numeric part
+                        return match ? parseInt(match[0], 10) : null;
+                    })
+                    .filter(n => n !== null)
+                    .sort((a, b) => a - b);
+
+                const studentRangeStart = rollNumbers[0] || 0;
+                const studentRangeEnd = rollNumbers[rollNumbers.length - 1] || 0;
+
+                studentRoomAllotments.push({
+                    studentRange: `${studentRangeStart} - ${studentRangeEnd}`,
+                    count: rollNumbers.length,
+                    room: {
+                        building: room.building,
+                        roomNumber: room.roomNumber,
+                        floor: room.floor
+                    },
+                    rangeStart: studentRangeStart // For sorting later
+                });
             }
-          });
-        }
-      });
-      
-  
-      // Faculty-room allocations
-      const facultyAllocations = await Allocation.find({ examId: id })
-        .populate("roomId", "building roomNumber floor")
-        .populate("facultyId", "name");
-  
-      const facultyRoomAllotments = facultyAllocations.map(alloc => ({
-        facultyName: alloc.facultyId.name,
-        date: moment(alloc.date).format("YYYY-MM-DD"),
-        time: `${alloc.startTime} - ${alloc.endTime}`,
-        room: {
-          building: alloc.roomId.building,
-          roomNumber: alloc.roomId.roomNumber,
-          floor: alloc.roomId.floor
-        }
-      }));
-  
-      return res.status(200).json({
-        success: true,
-        exam: {
-          name: exam.name,
-          semester: exam.semester,
-          year: exam.year,
-          totalStudents: exam.totalStudents,
-          roomsUsed,
-          facultyAllotted: facultyNames,
-          studentRoomAllotments,
-          facultyRoomAllotments
-        }
-      });
-  
+        });
+
+        // 🔽 Sort the ranges properly before sending response
+        studentRoomAllotments.sort((a, b) => a.rangeStart - b.rangeStart);
+
+
+
+        // Faculty-room allocations
+        const facultyAllocations = await Allocation.find({ examId: id })
+            .populate("roomId", "building roomNumber floor")
+            .populate("facultyId", "name");
+
+        const facultyRoomAllotments = facultyAllocations.map(alloc => ({
+            facultyName: alloc.facultyId.name,
+            date: moment(alloc.date).format("YYYY-MM-DD"),
+            time: `${alloc.startTime} - ${alloc.endTime}`,
+            room: {
+                building: alloc.roomId.building,
+                roomNumber: alloc.roomId.roomNumber,
+                floor: alloc.roomId.floor
+            }
+        }));
+
+        return res.status(200).json({
+            success: true,
+            exam: {
+                name: exam.name,
+                semester: exam.semester,
+                year: exam.year,
+                totalStudents: exam.totalStudents,
+                roomsUsed,
+                facultyAllotted: facultyNames,
+                studentRoomAllotments: studentRoomAllotments.map(({ rangeStart, ...rest }) => rest),
+                facultyRoomAllotments
+            }
+        });
+        
+
     } catch (error) {
-      console.error("Error fetching exam by ID:", error);
-      return res.status(500).json({ success: false, message: "Internal Server Error" });
+        console.error("Error fetching exam by ID:", error);
+        return res.status(500).json({ success: false, message: "Internal Server Error" });
     }
 };
