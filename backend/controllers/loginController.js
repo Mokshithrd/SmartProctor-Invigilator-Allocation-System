@@ -11,7 +11,7 @@ exports.login = async (req, res) => {
             return res.status(400).json({
                 success: false,
                 message: "Enter all fields"
-            })
+            });
         }
 
         let user = await User.findOne({ email }).select("+password");
@@ -22,47 +22,47 @@ exports.login = async (req, res) => {
             });
         }
 
-        const payload = {
-            email: user.email,
-            id: user._id,
-            role: user.role
-        };
-
-        if (await bcrypt.compare(password, user.password)) {
-            let token = jwt.sign(payload,
-                process.env.JWT_SECRET,
-                {
-                    expiresIn: "3h"
-                }
-            );
-            user = user.toObject();
-            user.token = token;
-            user.password = undefined;
-
-            const options = {
-                maxAge: 3 * 60 * 60 * 1000,
-                httpOnly: true,
-                secure: process.env.NODE_ENV === "production", // Secure only in production
-                sameSite: "Strict", // Prevent CSRF attacks
-            }
-            res.cookie("token", token, options).status(200).json({
-                success: true,
-                token,
-                user,
-                message: "User logged in successfully",
-            });
-        } else {
+        const isPasswordValid = await bcrypt.compare(password, user.password);
+        if (!isPasswordValid) {
             return res.status(403).json({
                 success: false,
                 message: "Password Incorrect",
             });
         }
 
+        const payload = {
+            id: user._id,
+            email: user.email,
+            role: user.role,
+        };
+
+        const token = jwt.sign(payload, process.env.JWT_SECRET, {
+            expiresIn: "3h",
+        });
+
+        user = user.toObject();
+        user.token = token;
+        user.password = undefined;
+
+        // ⚠️ Important: set cookie with correct config
+        res.cookie("token", token, {
+            httpOnly: true,
+            secure: false, // set to true in production
+            sameSite: "Lax", // "Strict" or "Lax"
+            maxAge: 3 * 60 * 60 * 1000, // 3 hours
+        });
+
+        return res.status(200).json({
+            success: true,
+            message: "User logged in successfully",
+            token,
+            user,
+        });
     } catch (err) {
-        console.log(err);
+        console.error("Login Error:", err);
         return res.status(500).json({
             success: false,
             message: "Login failure",
         });
     }
-}
+};

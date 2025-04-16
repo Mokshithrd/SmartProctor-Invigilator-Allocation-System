@@ -59,16 +59,45 @@ exports.addFaculty = async (req, res) => {
     }
 };
 
-// Get All Faculties - Admin only
 exports.getAllFaculties = async (req, res) => {
     try {
-        const faculties = await User.find({ role: "Faculty" }).select("-password");
-        res.status(200).json({ success: true, data: faculties });
+      const faculties = await User.find({ role: "Faculty" }).select("-password").lean();
+  
+      const facultyWithRooms = await Promise.all(
+        faculties.map(async (faculty) => {
+          const allocations = await Allocation.find({ facultyId: faculty._id })
+            .populate("roomId", "roomNumber building floor")
+            .populate("examId", "name")
+            .populate("subjectId", "name");
+  
+          const allocatedRooms = allocations.map((alloc) => ({
+            examName: alloc.examId?.name,
+            subjectName: alloc.subjectId?.name,
+            roomNumber: alloc.roomId?.roomNumber,
+            building: alloc.roomId?.building,
+            floor: alloc.roomId?.floor,
+            date: alloc.date,
+            startTime: alloc.startTime,
+            endTime: alloc.endTime,
+          }));
+  
+          return {
+            ...faculty,
+            allocatedRooms,
+          };
+        })
+      );
+  
+      res.status(200).json({
+        success: true,
+        data: facultyWithRooms,
+      });
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ success: false, message: "Failed to fetch faculties" });
+      console.error("Error fetching faculties with rooms:", err);
+      res.status(500).json({ success: false, message: "Failed to fetch faculties" });
     }
-};
+  };
+  
 
 // Get single faculty details
 exports.getFacultyById = async (req, res) => {
