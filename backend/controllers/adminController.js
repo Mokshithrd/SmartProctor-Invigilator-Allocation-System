@@ -39,16 +39,24 @@ exports.updateAdminProfile = async (req, res) => {
 
 exports.getAdminDashboardData = async (req, res) => {
     try {
-        const totalFaculty = await User.countDocuments({ role: "Faculty" });
-        const totalRooms = await Room.countDocuments();
-        const totalExams = await Exam.countDocuments();
+        const [totalFaculty, totalRooms, totalExams, studentAgg] = await Promise.all([
+            User.countDocuments({ role: "Faculty" }),
+            Room.countDocuments(),
+            Exam.countDocuments(),
+            Exam.aggregate([
+                { $group: { _id: null, totalStudents: { $sum: "$totalStudents" } } }
+            ])
+        ]);
+
+        const totalStudents = studentAgg[0]?.totalStudents || 0;
 
         res.status(200).json({
             success: true,
             data: {
                 totalFaculty,
                 totalRooms,
-                totalExams
+                totalExams,
+                totalStudents
             }
         });
     } catch (err) {
