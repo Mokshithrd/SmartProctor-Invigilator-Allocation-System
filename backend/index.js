@@ -1,7 +1,7 @@
 const express = require('express');
-const app = express();
-const cookieParser = require('cookie-parser');
+const mongoose = require("mongoose");
 const cors = require("cors");
+const cookieParser = require("cookie-parser");
 const PORT = process.env.PORT || 4000;
 
 require('dotenv').config();
@@ -9,13 +9,17 @@ require('dotenv').config();
 const dbConnect = require("./config/db");
 dbConnect();
 
+const app = express();
+
+// Middleware
 app.use(express.json());
 app.use(cookieParser());
 app.use(cors({
-    origin: "http://localhost:3000", // Change to frontend URL
+    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
 }));
-
 
 const userRoute = require("./routes/userRoute");
 const facultyRoute = require("./routes/facultyRoute")
