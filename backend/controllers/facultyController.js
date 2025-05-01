@@ -187,16 +187,19 @@ exports.getFacultyDashboardData = async (req, res) => {
             const startTimeFormatted = formatTime12Hour(allocation.startTime);
             const endTimeFormatted = formatTime12Hour(allocation.endTime);
 
+            // Ensure roomId exists and has the required properties
+            const room = allocation.roomId ? {
+                number: allocation.roomId.roomNumber || "N/A", // Default if roomNumber is missing
+                building: allocation.roomId.building || "N/A",  // Default if building is missing
+                floor: allocation.roomId.floor || "N/A"         // Default if floor is missing
+            } : null;
+
             const data = {
                 examName: allocation.examId.name,
                 date: allocationDateString,
                 startTime: startTimeFormatted,
                 endTime: endTimeFormatted,
-                room: {
-                    number: allocation.roomId.roomNumber,
-                    building: allocation.roomId.building,
-                    floor: allocation.roomId.floor,
-                }
+                room
             };
 
             if (allocationDateString === todayDateString) {
@@ -219,6 +222,7 @@ exports.getFacultyDashboardData = async (req, res) => {
         res.status(500).json({ success: false, message: "Internal server error" });
     }
 };
+
 
 // Get all previous allocation of a faculty
 exports.getFacultyAllocations = async (req, res) => {

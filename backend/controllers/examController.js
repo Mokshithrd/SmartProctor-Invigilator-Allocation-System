@@ -265,7 +265,6 @@ exports.getAllExams = async (req, res) => {
             const earliestDate = moment.min(subjectDates);
             const latestDate = moment.max(subjectDates);
 
-            // Categorize based on date
             if (now.isBefore(earliestDate)) {
                 upcoming.push(exam);
             } else if (now.isAfter(latestDate)) {
@@ -275,15 +274,22 @@ exports.getAllExams = async (req, res) => {
             }
         }
 
-        // Format response
         const formatExam = (examList) =>
             examList.map(exam => ({
+                _id: exam._id,
                 name: exam.name,
                 semester: exam.semester,
                 year: exam.year,
                 totalStudents: exam.totalStudents,
                 roomsUsed: exam.rooms.length,
-                uniqueFacultyCount: new Set(exam.faculty.map(fac => fac._id.toString())).size
+                uniqueFacultyCount: new Set(exam.faculty.map(fac => fac._id.toString())).size,
+                subjects: exam.subjects.map(s => ({
+                    name: s.name,
+                    subjectCode: s.subjectCode,
+                    date: s.date,
+                    startTime: s.startTime,
+                    endTime: s.endTime
+                }))
             }));
 
         return res.status(200).json({
@@ -299,104 +305,61 @@ exports.getAllExams = async (req, res) => {
     }
 };
 
+
 exports.getExamById = async (req, res) => {
-    const { id } = req.params;
-
     try {
-        const exam = await Exam.findById(id)
-            .populate("rooms", "roomNumber building floor")
-            .populate("faculty", "name email")
-            .populate("subjects");
-
-        if (!exam) {
-            return res.status(404).json({ success: false, message: "Exam not found" });
-        }
-
-        // Rooms used
-        const roomsUsed = exam.rooms.map(room => ({
-            building: room.building,
-            roomNumber: room.roomNumber,
-            floor: room.floor
-        }));
-
-        // Faculty names
-        const facultyNames = exam.faculty.map(fac => fac.name);
-
-        // Rooms allotted to students
-        const roomAllocations = await RoomAllocation.find({ examId: id }).populate("roomId");
-
-        const seenRooms = new Set();
-        const studentRoomAllotments = [];
-
-        roomAllocations.forEach((alloc) => {
-            const room = alloc.roomId;
-            const roomKey = `${room._id}`;
-
-            if (!seenRooms.has(roomKey)) {
-                seenRooms.add(roomKey);
-
-                const rollNumbers = alloc.students
-                    .map(s => {
-                        const match = s.match(/\d+/); // Extract numeric part
-                        return match ? parseInt(match[0], 10) : null;
-                    })
-                    .filter(n => n !== null)
-                    .sort((a, b) => a - b);
-
-                const studentRangeStart = rollNumbers[0] || 0;
-                const studentRangeEnd = rollNumbers[rollNumbers.length - 1] || 0;
-
-                studentRoomAllotments.push({
-                    studentRange: `${studentRangeStart} - ${studentRangeEnd}`,
-                    count: rollNumbers.length,
-                    room: {
-                        building: room.building,
-                        roomNumber: room.roomNumber,
-                        floor: room.floor
-                    },
-                    rangeStart: studentRangeStart // For sorting later
-                });
-            }
+      // Fetch the exam details from the database
+      const exam = await Exam.findById(req.params.id)
+        .populate('rooms')   // Assuming rooms is populated
+        .populate('faculty') // Assuming faculty is populated
+        .populate('subjects'); // Assuming subjects is populated
+  
+      // If no exam is found, return a 404 error
+      if (!exam) {
+        return res.status(404).json({ success: false, message: 'Exam not found' });
+      }
+  
+      console.log("Exam fetched:", exam);
+  
+      // Check if the exam has the necessary fields before processing
+      if (exam.rooms && Array.isArray(exam.rooms)) {
+        exam.rooms.forEach(room => {
+          if (room && room._id) {
+            // Safe to access room._id
+            console.log('Room:', room);
+          }
         });
-
-        // 🔽 Sort the ranges properly before sending response
-        studentRoomAllotments.sort((a, b) => a.rangeStart - b.rangeStart);
-
-
-
-        // Faculty-room allocations
-        const facultyAllocations = await Allocation.find({ examId: id })
-            .populate("roomId", "building roomNumber floor")
-            .populate("facultyId", "name");
-
-        const facultyRoomAllotments = facultyAllocations.map(alloc => ({
-            facultyName: alloc.facultyId.name,
-            date: moment(alloc.date).format("YYYY-MM-DD"),
-            time: `${alloc.startTime} - ${alloc.endTime}`,
-            room: {
-                building: alloc.roomId.building,
-                roomNumber: alloc.roomId.roomNumber,
-                floor: alloc.roomId.floor
-            }
-        }));
-
-        return res.status(200).json({
-            success: true,
-            exam: {
-                name: exam.name,
-                semester: exam.semester,
-                year: exam.year,
-                totalStudents: exam.totalStudents,
-                roomsUsed,
-                facultyAllotted: facultyNames,
-                studentRoomAllotments: studentRoomAllotments.map(({ rangeStart, ...rest }) => rest),
-                facultyRoomAllotments
-            }
+      } else {
+        console.warn('No rooms found for the exam');
+      }
+  
+      if (exam.faculty && Array.isArray(exam.faculty)) {
+        exam.faculty.forEach(facultyMember => {
+          if (facultyMember && facultyMember._id) {
+            // Safe to access facultyMember._id
+            console.log('Faculty Member:', facultyMember);
+          }
         });
-        
-
-    } catch (error) {
-        console.error("Error fetching exam by ID:", error);
-        return res.status(500).json({ success: false, message: "Internal Server Error" });
+      } else {
+        console.warn('No faculty found for the exam');
+      }
+  
+      if (exam.subjects && Array.isArray(exam.subjects)) {
+        exam.subjects.forEach(subject => {
+          if (subject && subject._id) {
+            // Safe to access subject._id
+            console.log('Subject:', subject);
+          }
+        });
+      } else {
+        console.warn('No subjects found for the exam');
+      }
+  
+      // Return the exam details if everything is fine
+      return res.status(200).json({ success: true, exam });
+    } catch (err) {
+      console.error("Error fetching exam by ID:", err);
+      return res.status(500).json({ success: false, message: 'Error fetching exam details' });
     }
-};
+  };
+  

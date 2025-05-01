@@ -5,7 +5,7 @@ export const fetchAllExams = createAsyncThunk(
   "exams/fetchAll",
   async (_, thunkAPI) => {
     try {
-      const res = await axios.get("http://localhost:4000/exams", {
+      const res = await axios.get("http://localhost:4000/exam", {
         withCredentials: true,
       });
       return {
