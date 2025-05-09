@@ -12,7 +12,7 @@ router.get("/all", auth, isAdmin, getAllFaculties);
 router.delete("/:id", auth, isAdmin, deleteFaculty);
 
 // Faculty route - update own profile
-router.put("/update", auth, isFaculty, updateOwnProfile);
+router.put("/update/:id", auth, isFaculty, updateOwnProfile);
 
 // Faculty dashboard
 router.get("/dashboard", auth, isFaculty, getFacultyDashboardData);
