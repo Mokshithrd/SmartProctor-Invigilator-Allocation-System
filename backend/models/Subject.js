@@ -4,6 +4,7 @@ const subjectSchema = new mongoose.Schema({
     exam: { type: mongoose.Schema.Types.ObjectId, ref: "Exam", required: true }, // Link to exam
     name: { type: String, required: true }, // Subject Name
     subjectCode: { type: String, required: true }, // Subject Code
+    semester: { type: Number, required: true }, // Add semester field to link subject to specific semester
     date: { type: Date, required: true }, // Exam Date
     startTime: { type: String, required: true }, // Exam Start Time (e.g., "10:00 AM")
     endTime: { type: String, required: true } // Exam End Time (e.g., "12:00 PM")

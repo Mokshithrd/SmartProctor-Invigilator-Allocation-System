@@ -31,13 +31,23 @@ exports.allocateFacultyToRooms = async (examId, facultyIds, session) => {
         const roomTimeSlots = roomAllocations.map(room => ({
             roomId: room.roomId.toString(),
             roomNumber: room.roomNumber,
-            subjectId: room.subjectId,
+            // Get the subjectId, either from the single field or the first from the array
+            subjectId: room.subjectId || (room.subjectIds && room.subjectIds.length > 0 ? room.subjectIds[0] : null),
             date: room.date,
             startTime: room.startTime,
             endTime: room.endTime
         }));
 
-        console.log("roomTimeSlots = \n", roomTimeSlots);
+        // Check for any slots without a valid subjectId
+        const invalidSlots = roomTimeSlots.filter(slot => !slot.subjectId);
+        if (invalidSlots.length > 0) {
+            return { 
+                success: false, 
+                message: `Room ${invalidSlots[0].roomNumber} has no subject assigned. Please ensure all rooms have at least one subject.` 
+            };
+        }
+
+        // console.log("roomTimeSlots = \n", roomTimeSlots);
 
         const facultyList = await User.find({
             _id: { $in: facultyIds },
@@ -45,7 +55,7 @@ exports.allocateFacultyToRooms = async (examId, facultyIds, session) => {
             available: true
         });
 
-        console.log("facultyList = \n", facultyList);
+        // console.log("facultyList = \n", facultyList);
 
         if (facultyList.length === 0) {
             return { success: false, message: "No available faculty members." };
@@ -55,7 +65,7 @@ exports.allocateFacultyToRooms = async (examId, facultyIds, session) => {
         const reusableFaculty = [];
         const previousAllocationsMap = new Map();
 
-        // Step 1: Reuse faculty from previous exact room/date/time matches
+        // Step 1: Reuse faculty from previous exam exact room/date/time matches
         for (let slot of roomTimeSlots) {
             const existing = await Allocation.findOne({
                 roomId: slot.roomId,
@@ -64,7 +74,7 @@ exports.allocateFacultyToRooms = async (examId, facultyIds, session) => {
                 endTime: slot.endTime
             }).session(session);
 
-            console.log("existing = \n", existing);
+            // console.log("existing = \n", existing);
 
             if (existing) {
                 assignedFaculty.push({
@@ -83,14 +93,14 @@ exports.allocateFacultyToRooms = async (examId, facultyIds, session) => {
             }
         }
 
-        console.log("reusableFaculty = \n", reusableFaculty);
-        console.log("previousAllocationsMap = \n", previousAllocationsMap);
+        // console.log("reusableFaculty = \n", reusableFaculty);
+        // console.log("previousAllocationsMap = \n", previousAllocationsMap);
 
         const remainingSlots = roomTimeSlots.filter(slot =>
             !previousAllocationsMap.has(slot.roomId + slot.startTime + slot.endTime)
         );
 
-        console.log("remainingSlots = \n", remainingSlots);
+        // console.log("remainingSlots = \n", remainingSlots);
 
         const designationGroups = {
             assistant: [],
@@ -105,10 +115,10 @@ exports.allocateFacultyToRooms = async (examId, facultyIds, session) => {
             else if (faculty.designation === "Professor") designationGroups.professor.push(faculty);
         }
 
-        console.log("designationGroups = \n", designationGroups);
+        // console.log("designationGroups = \n", designationGroups);
 
         const totalRemaining = remainingSlots.length;
-        console.log("totalRemaining = \n", totalRemaining);
+        // console.log("totalRemaining = \n", totalRemaining);
 
         const limits = getDesignationPercentageLimit(totalRemaining);
         console.log("limits = \n", limits);

@@ -7,10 +7,6 @@ exports.checkRoomAvailability = async (selectedRoomIds, examDate, startTime, end
         const date = moment.tz(examDate, "YYYY-MM-DD", "Asia/Kolkata").startOf("day").toDate();
         const formattedStart = moment(startTime, ["h:mm A", "HH:mm"]).format("HH:mm");
         const formattedEnd = moment(endTime, ["h:mm A", "HH:mm"]).format("HH:mm");
-        // console.log("▶ Exam Date (Raw):", examDate);
-        // console.log("▶ Parsed Local Date:", moment.tz(examDate, "Asia/Kolkata").format());
-        // console.log("▶ Stored Date (UTC):", date);
-
 
         // Fetch selected rooms
         const selectedRooms = await Room.find({ _id: { $in: selectedRoomIds } });
@@ -40,9 +36,6 @@ exports.checkRoomAvailability = async (selectedRoomIds, examDate, startTime, end
             totalAvailable += remaining;
         }
 
-        // console.log("Total available seats:", totalAvailable);
-        // console.log("Total students to allocate:", totalStudents);
-
         if (totalAvailable < totalStudents) {
             return {
                 success: false,
@@ -62,55 +55,45 @@ exports.checkRoomAvailability = async (selectedRoomIds, examDate, startTime, end
     }
 };
 
-exports.allocateStudentsToRooms = async (examId, subjectId, totalStudents, selectedRoomIds, examDate, startTime, endTime, session) => {
+exports.allocateStudentsToRooms = async (examId, subjectId, totalStudents, selectedRoomIds, examDate, startTime, endTime, semester, session) => {
     try {
         const date = moment.tz(examDate, "YYYY-MM-DD", "Asia/Kolkata").startOf("day").toDate();
         const formattedStart = moment(startTime, ["h:mm A", "HH:mm"]).format("HH:mm");
         const formattedEnd = moment(endTime, ["h:mm A", "HH:mm"]).format("HH:mm");
-        // console.log("▶ Exam Date (Raw):", examDate);
-        // console.log("▶ Parsed Local Date:", moment.tz(examDate, "Asia/Kolkata").format());
-        // console.log("▶ Stored Date (UTC):", date);
 
-        let allocations = [];
-        let studentIndex = 1;
-
-        // Step 1: Find existing allocations (partially used)
+        // Check if there are existing allocations for these rooms at this time
         const existingAllocations = await RoomAllocation.find({
             roomId: { $in: selectedRoomIds },
             date,
-            startTime: formattedStart,
-            endTime: formattedEnd
+            $or: [
+                { startTime: { $lt: formattedEnd }, endTime: { $gt: formattedStart } }
+            ]
         });
 
-        const usedRoomIds = existingAllocations.map(a => a.roomId.toString());
-        const roomUsageMap = {};
+        if (existingAllocations.length > 0) {
+            return {
+                success: false,
+                message: `Rooms already allocated for this date and time. Please select different rooms or timings.`
+            };
+        }
 
-        existingAllocations.forEach(a => {
-            const roomId = a.roomId.toString();
-            const assigned = a.students.length;
-            roomUsageMap[roomId] = (roomUsageMap[roomId] || 0) + assigned;
-            // console.log("roomUsageMap[roomId] = ",roomUsageMap[roomId]);
-        });
+        let allocations = [];
+        let studentIndex = 1;
 
         const allRooms = await Room.find({ _id: { $in: selectedRoomIds } });
         const sortedRooms = allRooms.sort((a, b) => b.capacity - a.capacity);
 
         for (let room of sortedRooms) {
-            const roomIdStr = room._id.toString();
-            let availableSeats;
+            if (totalStudents <= 0) break;
 
-            if (usedRoomIds.includes(roomIdStr)) {
-                availableSeats = room.capacity - (roomUsageMap[roomIdStr] || 0);
-            } else {
-                availableSeats = room.capacity;
-            }
-
-            if (availableSeats <= 0) continue;
-
-            const assignCount = Math.min(totalStudents, availableSeats);
+            const assignCount = Math.min(totalStudents, room.capacity);
             if (assignCount === 0) continue;
 
-            const students = Array.from({ length: assignCount }, (_, i) => `Student ${studentIndex + i}`);
+            // Use consistent student naming format: "Sem{semester}-Student{index}"
+            const students = Array.from(
+                { length: assignCount }, 
+                (_, i) => `Sem${semester}-Student${studentIndex + i}`
+            );
 
             const newAllocation = new RoomAllocation({
                 examId,
@@ -128,7 +111,6 @@ exports.allocateStudentsToRooms = async (examId, subjectId, totalStudents, selec
 
             studentIndex += assignCount;
             totalStudents -= assignCount;
-            if (totalStudents <= 0) break;
         }
 
         if (totalStudents > 0) {
@@ -145,6 +127,172 @@ exports.allocateStudentsToRooms = async (examId, subjectId, totalStudents, selec
         };
     } catch (err) {
         console.error("Allocation error:", err);
+        return { success: false, message: "Internal Server Error" };
+    }
+};
+
+/**
+ * Allocate multiple semesters' students to rooms
+ * @param {Array} semesterData - Array of objects with examId, subjectId, totalStudents, semester
+ * @param {Array} selectedRoomIds - Array of room IDs to allocate
+ * @param {String} examDate - Date of the exam
+ * @param {String} startTime - Start time of the exam
+ * @param {String} endTime - End time of the exam
+ * @param {Object} session - Mongoose session for transaction
+ * @returns {Object} - Result of allocation
+ */
+exports.allocateMultiSemesterToRooms = async (semesterData, selectedRoomIds, examDate, startTime, endTime, session) => {
+    try {
+        const date = moment.tz(examDate, "YYYY-MM-DD", "Asia/Kolkata").startOf("day").toDate();
+        const formattedStart = moment(startTime, ["h:mm A", "HH:mm"]).format("HH:mm");
+        const formattedEnd = moment(endTime, ["h:mm A", "HH:mm"]).format("HH:mm");
+
+        // Check if there are existing allocations for these rooms at this time
+        const existingAllocations = await RoomAllocation.find({
+            roomId: { $in: selectedRoomIds },
+            date,
+            $or: [
+                { startTime: { $lt: formattedEnd }, endTime: { $gt: formattedStart } }
+            ]
+        });
+
+        if (existingAllocations.length > 0) {
+            return {
+                success: false,
+                message: `Rooms already allocated for this date and time. Please select different rooms or timings.`
+            };
+        }
+
+        // We expect exactly 2 semesters in the semesterData
+        if (semesterData.length !== 2) {
+            return {
+                success: false,
+                message: "Multi-semester allocation requires exactly 2 semesters."
+            };
+        }
+
+        const sem1 = semesterData[0];
+        const sem2 = semesterData[1];
+
+        // Track remaining students to allocate
+        let remainingSem1Students = sem1.totalStudents;
+        let remainingSem2Students = sem2.totalStudents;
+        let totalStudents = remainingSem1Students + remainingSem2Students;
+
+        // Track student indices for each semester
+        let sem1StudentIndex = 1;
+        let sem2StudentIndex = 1;
+
+        // Fetch all rooms and sort by capacity
+        const allRooms = await Room.find({ _id: { $in: selectedRoomIds } });
+        const sortedRooms = allRooms.sort((a, b) => b.capacity - a.capacity);
+
+        let allocations = [];
+
+        // First, distribute students evenly across rooms
+        for (let room of sortedRooms) {
+            if (remainingSem1Students <= 0 && remainingSem2Students <= 0) break;
+
+            const roomCapacity = room.capacity;
+            let sem1StudentsInRoom = 0;
+            let sem2StudentsInRoom = 0;
+
+            // Balanced allocation logic - divide room capacity equally
+            if (remainingSem1Students > 0 && remainingSem2Students > 0) {
+                // Try to allocate half of the room to each semester
+                const halfCapacity = Math.floor(roomCapacity / 2);
+                
+                // Initially allocate half of room capacity to each semester
+                sem1StudentsInRoom = Math.min(halfCapacity, remainingSem1Students);
+                sem2StudentsInRoom = Math.min(halfCapacity, remainingSem2Students);
+                
+                // If one semester doesn't need its full half, give remaining space to the other
+                const unusedCapacity = roomCapacity - (sem1StudentsInRoom + sem2StudentsInRoom);
+                
+                if (unusedCapacity > 0) {
+                    if (remainingSem1Students > sem1StudentsInRoom) {
+                        const additionalSem1 = Math.min(unusedCapacity, remainingSem1Students - sem1StudentsInRoom);
+                        sem1StudentsInRoom += additionalSem1;
+                    }
+                    
+                    // After giving to sem1, if there's still space and sem2 needs it
+                    const stillUnused = roomCapacity - (sem1StudentsInRoom + sem2StudentsInRoom);
+                    if (stillUnused > 0 && remainingSem2Students > sem2StudentsInRoom) {
+                        const additionalSem2 = Math.min(stillUnused, remainingSem2Students - sem2StudentsInRoom);
+                        sem2StudentsInRoom += additionalSem2;
+                    }
+                }
+            } else if (remainingSem1Students > 0) {
+                // Only semester 1 students left
+                sem1StudentsInRoom = Math.min(roomCapacity, remainingSem1Students);
+            } else {
+                // Only semester 2 students left
+                sem2StudentsInRoom = Math.min(roomCapacity, remainingSem2Students);
+            }
+
+            // Create a combined allocation for both semesters in the same room
+            const combinedStudents = [];
+            const subjectIds = [];
+            
+            // Add semester 1 students
+            if (sem1StudentsInRoom > 0) {
+                const sem1Students = Array.from(
+                    { length: sem1StudentsInRoom }, 
+                    (_, i) => `Sem${sem1.semester}-Student${sem1StudentIndex + i}`
+                );
+                combinedStudents.push(...sem1Students);
+                subjectIds.push(sem1.subjectId);
+                
+                sem1StudentIndex += sem1StudentsInRoom;
+                remainingSem1Students -= sem1StudentsInRoom;
+            }
+            
+            // Add semester 2 students
+            if (sem2StudentsInRoom > 0) {
+                const sem2Students = Array.from(
+                    { length: sem2StudentsInRoom }, 
+                    (_, i) => `Sem${sem2.semester}-Student${sem2StudentIndex + i}`
+                );
+                combinedStudents.push(...sem2Students);
+                subjectIds.push(sem2.subjectId);
+                
+                sem2StudentIndex += sem2StudentsInRoom;
+                remainingSem2Students -= sem2StudentsInRoom;
+            }
+            
+            // Create a single allocation with both semester subjects and students
+            if (combinedStudents.length > 0) {
+                const newAllocation = new RoomAllocation({
+                    examId: sem1.examId, // Both have the same examId
+                    subjectIds: subjectIds, // Store array of subject IDs
+                    roomId: room._id,
+                    roomNumber: room.roomNumber,
+                    students: combinedStudents,
+                    date,
+                    startTime: formattedStart,
+                    endTime: formattedEnd
+                });
+                
+                await newAllocation.save({ session });
+                allocations.push(newAllocation);
+            }
+        }
+
+        // Check if all students were allocated
+        if (remainingSem1Students > 0 || remainingSem2Students > 0) {
+            return {
+                success: false,
+                message: `Insufficient capacity. Unable to allocate ${remainingSem1Students + remainingSem2Students} students.`
+            };
+        }
+
+        return {
+            success: true,
+            message: "Multi-semester room allocation successful",
+            allocations
+        };
+    } catch (err) {
+        console.error("Multi-semester allocation error:", err);
         return { success: false, message: "Internal Server Error" };
     }
 };
