@@ -1,32 +1,39 @@
+// src/components/Sidebar.jsx
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import axios from 'axios';
-import { 
-  FaHome, 
-  FaCalendarAlt, 
-  FaUserGraduate, 
-  FaBuilding, 
+import { useDispatch, useSelector } from 'react-redux'; // Import Redux hooks
+import { logoutUser, selectAuthLoading } from "../redux/authSlice"; // Import logoutUser thunk
+
+import {
+  FaHome,
+  FaCalendarAlt,
+  FaUserGraduate,
+  FaBuilding,
   FaChevronDown,
   FaSignOutAlt,
   FaChartBar
 } from 'react-icons/fa';
 
-export default function Sidebar({ user }) {
+export default function Sidebar({ user }) { // `user` prop is still fine if you pass it
   const { pathname } = useLocation();
+  const dispatch = useDispatch();
+  const logoutLoading = useSelector(selectAuthLoading); // Can use this for logout button loading
+
   const [examsOpen, setExamsOpen] = useState(false);
   const [facultyOpen, setFacultyOpen] = useState(false);
   const [roomsOpen, setRoomsOpen] = useState(false);
 
   const handleLogout = async () => {
-      await axios.post("http://localhost:4000/auth/logout", {
-        withCredentials: true,
-      });
-     
-      window.location.href = "/login";
-    };
-  
+    dispatch(logoutUser()); // Dispatch the logoutUser thunk
+    // Redirection to /login is now handled within the logoutUser thunk
+  };
+
   // Auto-expand dropdown based on current path
   useEffect(() => {
+    setExamsOpen(false);
+    setFacultyOpen(false);
+    setRoomsOpen(false);
+
     if (pathname.startsWith('/exams')) setExamsOpen(true);
     if (pathname.startsWith('/faculty')) setFacultyOpen(true);
     if (pathname.startsWith('/rooms')) setRoomsOpen(true);
@@ -35,7 +42,7 @@ export default function Sidebar({ user }) {
   // Determine if a nav item is active
   const isActive = (path) => pathname.startsWith(path);
 
-  // Sidebar dropdown component for reusability
+  // Sidebar dropdown component for reusability (unchanged)
   const DropdownMenu = ({ icon, title, isOpen, setIsOpen, path, children }) => (
     <div className="mb-1">
       <button
@@ -49,12 +56,12 @@ export default function Sidebar({ user }) {
         <span className="flex items-center gap-3">
           {icon} <span className="font-medium">{title}</span>
         </span>
-        <FaChevronDown 
-          className={`transform transition-transform duration-300 ${isOpen ? "rotate-180" : ""}`} 
-          size={14} 
+        <FaChevronDown
+          className={`transform transition-transform duration-300 ${isOpen ? "rotate-180" : ""}`}
+          size={14}
         />
       </button>
-      
+
       {isOpen && (
         <div className="ml-9 mt-2 space-y-1 overflow-hidden transition-all duration-300 ease-in-out">
           {children}
@@ -63,7 +70,7 @@ export default function Sidebar({ user }) {
     </div>
   );
 
-  // Menu item component for reusability
+  // Menu item component for reusability (unchanged)
   const MenuItem = ({ to, icon, title }) => (
     <Link
       to={to}
@@ -77,10 +84,10 @@ export default function Sidebar({ user }) {
     </Link>
   );
 
-  // Submenu item component
+  // Submenu item component (unchanged)
   const SubMenuItem = ({ to, title }) => (
-    <Link 
-      to={to} 
+    <Link
+      to={to}
       className={`block py-2 pl-3 text-sm rounded-lg transition-all duration-200 ${
         pathname === to
           ? "text-blue-600 font-medium bg-blue-50"
@@ -90,6 +97,9 @@ export default function Sidebar({ user }) {
       {title}
     </Link>
   );
+
+  const isAdmin = user?.role?.toLowerCase() === 'admin';
+  const isFaculty = user?.role?.toLowerCase() === 'faculty';
 
   return (
     <aside className="w-72 bg-white shadow-lg border-r min-h-screen fixed hidden md:block overflow-y-auto">
@@ -106,7 +116,7 @@ export default function Sidebar({ user }) {
             </h1>
           </div>
         </div>
-        
+
         {user && (
           <div className="flex items-center p-3 bg-gray-50 rounded-xl mb-6">
             <div className="w-10 h-10 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 flex items-center justify-center text-white font-medium">
@@ -119,65 +129,70 @@ export default function Sidebar({ user }) {
           </div>
         )}
       </div>
-      
+
       <nav className="space-y-1 px-4 pb-6">
-        {/* Dashboard */}
-        <MenuItem 
-          to="/dashboard/admin" 
-          icon={<FaHome className="text-lg" />} 
-          title="Dashboard" 
-        />
+        {/* Admin Specific Links */}
+        {isAdmin && (
+          <>
+            <MenuItem
+              to="/dashboard/admin"
+              icon={<FaHome className="text-lg" />}
+              title="Dashboard"
+            />
 
-        {/* Faculty Dashboard - NEW ITEM */}
-        <MenuItem 
-          to="/dashboard" 
-          icon={<FaChartBar className="text-lg" />} 
-          title="Faculty Dashboard" 
-        />
+            <DropdownMenu
+              icon={<FaCalendarAlt className="text-lg" />}
+              title="Exams"
+              isOpen={examsOpen}
+              setIsOpen={setExamsOpen}
+              path="/exams"
+            >
+              <SubMenuItem to="/exams" title="View Exams" />
+              <SubMenuItem to="/exams/create" title="Create Exam" />
+            </DropdownMenu>
 
-        {/* Exams Dropdown */}
-        <DropdownMenu
-          icon={<FaCalendarAlt className="text-lg" />}
-          title="Exams"
-          isOpen={examsOpen}
-          setIsOpen={setExamsOpen}
-          path="/exams"
-        >
-          <SubMenuItem to="/exams" title="View Exams" />
-          <SubMenuItem to="/exams/create" title="Create Exam" />
-        </DropdownMenu>
+            <DropdownMenu
+              icon={<FaUserGraduate className="text-lg" />}
+              title="Faculty"
+              isOpen={facultyOpen}
+              setIsOpen={setFacultyOpen}
+              path="/faculty"
+            >
+              <SubMenuItem to="/faculty" title="View Faculty" />
+              <SubMenuItem to="/faculty/add" title="Add Faculty" />
+            </DropdownMenu>
 
-        {/* Faculty Dropdown */}
-        <DropdownMenu
-          icon={<FaUserGraduate className="text-lg" />}
-          title="Faculty"
-          isOpen={facultyOpen}
-          setIsOpen={setFacultyOpen}
-          path="/faculty"
-        >
-          <SubMenuItem to="/faculty" title="View Faculty" />
-          <SubMenuItem to="/faculty/add" title="Add Faculty" />
-        </DropdownMenu>
+            <DropdownMenu
+              icon={<FaBuilding className="text-lg" />}
+              title="Rooms"
+              isOpen={roomsOpen}
+              setIsOpen={setRoomsOpen}
+              path="/rooms"
+            >
+              <SubMenuItem to="/rooms" title="View Rooms" />
+              <SubMenuItem to="/rooms/add" title="Add Room" />
+            </DropdownMenu>
+          </>
+        )}
 
-        {/* Rooms Dropdown */}
-        <DropdownMenu
-          icon={<FaBuilding className="text-lg" />}
-          title="Rooms"
-          isOpen={roomsOpen}
-          setIsOpen={setRoomsOpen}
-          path="/rooms"
-        >
-          <SubMenuItem to="/rooms" title="View Rooms" />
-          <SubMenuItem to="/rooms/add" title="Add Room" />
-        </DropdownMenu>
-        
-        {/* Sign Out - Added for completeness */}
-        <div className="pt-6 mt-6 border-t border-gray-200"  onClick={handleLogout}>
-          <Link
-            className="flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-red-500 hover:bg-red-50 transition-all duration-200"
+        {/* Faculty Specific Links */}
+        {isFaculty && (
+          <MenuItem
+            to="/dashboard/faculty"
+            icon={<FaChartBar className="text-lg" />}
+            title="Faculty Dashboard"
+          />
+        )}
+
+        {/* Sign Out - Always visible for both roles */}
+        <div className="pt-6 mt-6 border-t border-gray-200">
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-red-500 hover:bg-red-50 transition-all duration-200 w-full text-left"
+            disabled={logoutLoading === 'pending'}
           >
-            <FaSignOutAlt /> <span>Sign Out</span>
-          </Link>
+            <FaSignOutAlt /> <span>{logoutLoading === 'pending' ? 'Signing Out...' : 'Sign Out'}</span>
+          </button>
         </div>
       </nav>
     </aside>
