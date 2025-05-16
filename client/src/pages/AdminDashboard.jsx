@@ -111,12 +111,12 @@ export default function Dashboard({ user }) {
               >
                 <FaUserEdit /> Update Profile
               </Link>
-              <button
+              {/* <button
                 onClick={handleLogout}
                 className="bg-red-50 text-red-600 border border-red-200 px-4 py-2 rounded-lg hover:bg-red-100 transition-colors duration-200 flex items-center gap-2 shadow-sm"
               >
                 <FaSignOutAlt /> Logout
-              </button>
+              </button> */}
             </div>
           </div>
 

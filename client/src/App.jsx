@@ -3,11 +3,14 @@ import {
   Routes,
   Route,
   Navigate,
-  useLocation,
+  useLocation
 } from "react-router-dom";
-import { useState, useEffect } from "react";
-import axios from "axios";
+import { useEffect } from "react";
 import { Toaster } from "react-hot-toast";
+import { useDispatch, useSelector, Provider } from "react-redux";
+import store  from './redux/Store';
+// Import auth thunk and selectors
+import { fetchAuthStatus, loginUser, logoutUser, selectUser, selectAuthLoading, selectIsAuthenticated } from "./redux/authSlice";
 
 // Pages
 import Login from "./pages/Login";
@@ -29,40 +32,45 @@ import Unauthorized from "./pages/Unauthorized";
 // Components
 import Navbar from "./components/Navbar";
 import Sidebar from "./components/Sidebar";
-import RequireAuth from "./components/RequireAuth"; // ✅ already good
+import ProtectedRoute from "./components/ProtectedRoute";
+import ProtectedRouteForLogin from "./components/ProtectedRouteForLogin";
 import ExamList from "./components/ExamList";
-import ProtectedRoute from "./components/ProtectedRoute"; // ✅
-import ProtectedRouteForLogin from "./components/ProtectedRouteForLogin"; // (If you want login protected if already logged in)
 
-function AppWrapper() {
-  const location = useLocation();
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true); // 🚀 added loading state
+// Main App component (wraps routes and general layout)
+function AppContent() {
+  const dispatch = useDispatch();
+  const user = useSelector(selectUser);
+  const loading = useSelector(selectAuthLoading);
+  const isAuthenticated = useSelector(selectIsAuthenticated);
+  const location = useLocation(); // Use useLocation
 
   useEffect(() => {
-    axios
-      .get("http://localhost:4000/auth/me", { withCredentials: true })
-      .then((res) => setUser(res.data.user))
-      .catch(() => setUser(null))
-      .finally(() => setLoading(false)); // 🚀 set loading false
-  }, []);
+    if (loading === 'idle') {
+      dispatch(fetchAuthStatus());
+    }
+  }, [dispatch, loading]);
 
-  const isLoginPage = location.pathname === "/login";
-
-  if (loading) {
-    return <div className="flex justify-center items-center h-screen text-2xl">Loading...</div>; // 👀 while checking auth
+  // Global loading indicator
+  if (loading === 'pending') {
+    return (
+      <div className="flex justify-center items-center h-screen text-2xl font-semibold text-blue-600">
+        Authenticating...
+      </div>
+    );
   }
+
+  const isLoginPage = location.pathname === "/login"; // Use location.pathname
 
   return (
     <div className="min-h-screen flex bg-gray-100 overflow-hidden">
-      {!isLoginPage && user && (
+      {!isLoginPage && isAuthenticated && (
         <div className="hidden md:block">
           <Sidebar user={user} />
         </div>
       )}
 
-      <div className={`flex flex-col flex-1 ${!isLoginPage && user ? "md:ml-64" : ""}`}>
-        {!isLoginPage && user && (
+      <div className={`flex flex-col flex-1 ${!isLoginPage && isAuthenticated ? "md:ml-64" : ""}`}>
+        {!isLoginPage && isAuthenticated && (
           <div className="md:hidden">
             <Navbar user={user} />
           </div>
@@ -70,159 +78,97 @@ function AppWrapper() {
 
         <main className="p-6 overflow-y-auto flex-1">
           <Routes>
-
-            {/* Public Routes */}
-            <Route path="/login" element={<Login setUser={setUser} />} />
+            {/* Public/Unprotected Routes */}
+            <Route path="/login" element={<ProtectedRouteForLogin><Login /></ProtectedRouteForLogin>} />
             <Route path="/unauthorized" element={<Unauthorized />} />
 
-            {/* Protected Routes */}
+            {/* Protected Routes - Admin */}
             <Route
               path="/dashboard/admin"
-              element={
-                <ProtectedRoute allowedRoles={["Admin"]}>
-                  <AdminDashboard user={user} />
-                </ProtectedRoute>
-              }
+              element={<ProtectedRoute allowedRoles={["admin"]}><AdminDashboard user={user} /></ProtectedRoute>}
             />
-
-            <Route
-              path="/dashboard/faculty"
-              element={
-                <ProtectedRoute allowedRoles={["Faculty"]}>
-                  <FacultyDashboard user={user} />
-                </ProtectedRoute>
-              }
-            />
-
-            <Route
-              path="/dashboard/student"
-              element={
-                <ProtectedRoute allowedRoles={["Admin", "Faculty"]}>
-                  <StudentDashboard user={user} />
-                </ProtectedRoute>
-              }
-            />
-
             <Route
               path="/admin/update-profile"
-              element={
-                <ProtectedRoute allowedRoles={["Admin"]}>
-                  <UpdateAdminProfile />
-                </ProtectedRoute>
-              }
+              element={<ProtectedRoute allowedRoles={["admin"]}><UpdateAdminProfile /></ProtectedRoute>}
             />
-
-            <Route
-              path="/exams"
-              element={
-                <ProtectedRoute allowedRoles={["Admin", "Faculty"]}>
-                  <ViewExams />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/exams/:id"
-              element={
-                <ProtectedRoute allowedRoles={["Admin", "Faculty"]}>
-                  <ExamDetail />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/exams/create"
-              element={
-                <ProtectedRoute allowedRoles={["Admin"]}>
-                  <CreateExam />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/exams/upcoming"
-              element={
-                <ProtectedRoute allowedRoles={["Admin", "Faculty"]}>
-                  <ExamList type="upcoming" />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/exams/ongoing"
-              element={
-                <ProtectedRoute allowedRoles={["Admin", "Faculty"]}>
-                  <ExamList type="inProgress" />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/exams/completed"
-              element={
-                <ProtectedRoute allowedRoles={["Admin", "Faculty"]}>
-                  <ExamList type="completed" />
-                </ProtectedRoute>
-              }
-            />
-
             <Route
               path="/rooms"
-              element={
-                <ProtectedRoute allowedRoles={["Admin"]}>
-                  <RoomList />
-                </ProtectedRoute>
-              }
+              element={<ProtectedRoute allowedRoles={["admin"]}><RoomList /></ProtectedRoute>}
             />
             <Route
               path="/rooms/add"
-              element={
-                <ProtectedRoute allowedRoles={["Admin"]}>
-                  <AddRoom />
-                </ProtectedRoute>
-              }
+              element={<ProtectedRoute allowedRoles={["admin"]}><AddRoom /></ProtectedRoute>}
             />
-
             <Route
               path="/faculty"
-              element={
-                <ProtectedRoute allowedRoles={["Admin"]}>
-                  <FacultyList />
-                </ProtectedRoute>
-              }
+              element={<ProtectedRoute allowedRoles={["admin"]}><FacultyList /></ProtectedRoute>}
             />
             <Route
               path="/faculty/add"
-              element={
-                <ProtectedRoute allowedRoles={["Admin"]}>
-                  <AddFaculty />
-                </ProtectedRoute>
-              }
+              element={<ProtectedRoute allowedRoles={["admin"]}><AddFaculty /></ProtectedRoute>}
             />
             <Route
               path="/faculty/:id"
-              element={
-                <ProtectedRoute allowedRoles={["Admin"]}>
-                  <FacultyDetails />
-                </ProtectedRoute>
-              }
+              element={<ProtectedRoute allowedRoles={["admin"]}><FacultyDetails /></ProtectedRoute>}
             />
             <Route
               path="/faculty/allocations/:id"
-              element={
-                <ProtectedRoute allowedRoles={["Admin"]}>
-                  <FacultyAllocations />
-                </ProtectedRoute>
-              }
+              element={<ProtectedRoute allowedRoles={["admin"]}><FacultyAllocations /></ProtectedRoute>}
+            />
+            <Route
+              path="/exams/create"
+              element={<ProtectedRoute allowedRoles={["admin"]}><CreateExam /></ProtectedRoute>}
             />
 
-            {/* Default fallback - Navigate based on role or login */}
+            {/* Protected Routes - Faculty */}
+            <Route
+              path="/dashboard/faculty"
+              element={<ProtectedRoute allowedRoles={["faculty"]}><FacultyDashboard user={user} /></ProtectedRoute>}
+            />
+
+            {/* Protected Routes - Admin & Faculty */}
+            <Route
+              path="/dashboard/student"
+              element={<ProtectedRoute allowedRoles={["admin", "faculty"]}><StudentDashboard user={user} /></ProtectedRoute>}
+            />
+            <Route
+              path="/exams"
+              element={<ProtectedRoute allowedRoles={["admin", "faculty"]}><ViewExams user={user} /></ProtectedRoute>}
+            />
+            <Route
+              path="/exams/:id"
+              element={<ProtectedRoute allowedRoles={["admin", "faculty"]}><ExamDetail /></ProtectedRoute>}
+            />
+            <Route
+              path="/exams/upcoming"
+              element={<ProtectedRoute allowedRoles={["admin", "faculty"]}><ExamList type="upcoming" /></ProtectedRoute>}
+            />
+            <Route
+              path="/exams/ongoing"
+              element={<ProtectedRoute allowedRoles={["admin", "faculty"]}><ExamList type="inProgress" /></ProtectedRoute>}
+            />
+            <Route
+              path="/exams/completed"
+              element={<ProtectedRoute allowedRoles={["admin", "faculty"]}><ExamList type="completed" /></ProtectedRoute>}
+            />
+
+            {/* Catch-all route */}
             <Route
               path="*"
               element={
-                user ? (
-                  <Navigate to={`/dashboard/${user.role.toLowerCase()}`} replace />
+                isAuthenticated ? (
+                  user?.role?.toLowerCase() === "admin" ? (
+                    <Navigate to="/dashboard/admin" replace />
+                  ) : user?.role?.toLowerCase() === "faculty" ? (
+                    <Navigate to="/dashboard/faculty" replace />
+                  ) : (
+                    <Navigate to="/" replace />
+                  )
                 ) : (
                   <Navigate to="/login" replace />
                 )
               }
             />
-
           </Routes>
         </main>
       </div>
@@ -230,11 +176,14 @@ function AppWrapper() {
   );
 }
 
+// Main App component where Redux Provider is used
 function App() {
   return (
     <Router>
       <Toaster position="top-right" reverseOrder={false} />
-      <AppWrapper />
+      <Provider store={store}>
+        <AppContent />
+      </Provider>
     </Router>
   );
 }

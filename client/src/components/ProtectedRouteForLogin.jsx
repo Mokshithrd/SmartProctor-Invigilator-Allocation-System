@@ -1,19 +1,30 @@
-import { Navigate, Outlet } from "react-router-dom";
-import { useSelector } from "react-redux";
+// src/components/ProtectedRouteForLogin.jsx
+import React from 'react';
+import { Navigate } from 'react-router-dom';
+import { useSelector } from 'react-redux'; // Import useSelector
+import { selectUser, selectAuthLoading, selectIsAuthenticated } from "../redux/authSlice";
 
-export default function ProtectedRoute({ allowedRoles }) {
-  const { user } = useSelector((state) => state.user);
+const ProtectedRouteForLogin = ({ children }) => {
+  const user = useSelector(selectUser);
+  const loading = useSelector(selectAuthLoading);
+  const isAuthenticated = useSelector(selectIsAuthenticated);
 
-  if (!user) {
-    // Not logged in
-    return <Navigate to="/login" replace />;
+  if (loading === 'pending') {
+    return null; // Don't decide until auth status is known
   }
 
-  if (!allowedRoles.includes(user.role)) {
-    // Logged in but wrong role
-    return <Navigate to="/unauthorized" replace />;
+  if (isAuthenticated) {
+    // If user is logged in, redirect them to their respective dashboard
+    if (user?.role?.toLowerCase() === 'admin') {
+      return <Navigate to="/dashboard/admin" replace />;
+    } else if (user?.role?.toLowerCase() === 'faculty') {
+      return <Navigate to="/dashboard/faculty" replace />;
+    }
+    // Default redirect if role is unknown or not explicitly handled
+    return <Navigate to="/" replace />;
   }
 
-  // All good, show the requested page
-  return <Outlet />;
-}
+  return children; // User is not logged in, allow them to see the login page
+};
+
+export default ProtectedRouteForLogin;
