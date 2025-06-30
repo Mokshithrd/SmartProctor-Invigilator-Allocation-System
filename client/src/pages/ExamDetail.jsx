@@ -1,26 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import axios from 'axios';
-import {
-    Container,
-    Typography,
-    Box,
-    CircularProgress,
-    Alert,
-    Button,
-    Grid,
-    Paper,
-    Table,
-    TableBody,
-    TableCell,
-    TableContainer,
-    TableHead,
-    TableRow,
-    Tabs,
-    Tab,
-    Stack,
-    Divider,
-} from '@mui/material';
+import { Container, Typography, Box, CircularProgress, Alert, Button, Grid, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Tabs, Tab, Stack, Divider, } from '@mui/material';
 import { Download, MailOutline } from '@mui/icons-material';
 
 const ExamDetail = () => {
@@ -47,12 +28,10 @@ const ExamDetail = () => {
 
     const handleDownloadPDF = async (type) => {
         try {
-            // --- UPDATED ENDPOINTS HERE ---
             const endpoint = type === 'faculty' ? `/pdf/faculty-room-pdf/${id}` : `/pdf/student-room-pdf/${id}`;
-            // --- END UPDATED ENDPOINTS ---
 
             const response = await axios.get(`http://localhost:4000${endpoint}`, {
-                responseType: 'blob', // Important for downloading files
+                responseType: 'blob',
                 withCredentials: true,
             });
 
@@ -266,29 +245,90 @@ const ExamDetail = () => {
                 </TabPanel>
 
                 <TabPanel value={tabValue} index={1}>
-                    <Typography variant="h6" gutterBottom sx={{ fontWeight: '600', color: 'text.primary' }}>Faculty Allocations</Typography>
-                    <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: '8px', overflow: 'hidden' }}>
-                        <Table size="small">
-                            <TableHead sx={{ bgcolor: 'primary.main' }}>
-                                <TableRow>
-                                    <TableCell sx={{ fontWeight: 'bold', color: 'white' }}>Faculty Name</TableCell>
-                                    <TableCell sx={{ fontWeight: 'bold', color: 'white' }}>Date</TableCell>
-                                    <TableCell sx={{ fontWeight: 'bold', color: 'white' }}>Time</TableCell>
-                                    <TableCell sx={{ fontWeight: 'bold', color: 'white' }}>Room Details</TableCell>
-                                </TableRow>
-                            </TableHead>
-                            <TableBody>
-                                {exam.facultyAllocations.map((allocation, index) => (
-                                    <TableRow key={index} sx={{ '&:nth-of-type(odd)': { backgroundColor: '#f9f9f9' } }}>
-                                        <TableCell>{allocation.facultyName}</TableCell>
-                                        <TableCell>{allocation.date}</TableCell>
-                                        <TableCell>{allocation.time}</TableCell>
-                                        <TableCell>{allocation.roomDetails}</TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    </TableContainer>
+                    <Typography variant="h6" gutterBottom sx={{ fontWeight: '600', color: 'text.primary' }}>
+                        Faculty Room Allotment Matrix
+                    </Typography>
+
+                    {(() => {
+                        const timetableDetails = {};
+                        const allDates = new Set();
+                        const allTimes = new Set();
+                        const allFaculty = new Set();
+
+                        exam.facultyAllocations.forEach(({ facultyName, date, time, roomDetails }) => {
+                            allDates.add(date);
+                            allTimes.add(time);
+                            allFaculty.add(facultyName);
+
+                            if (!timetableDetails[facultyName]) timetableDetails[facultyName] = {};
+                            if (!timetableDetails[facultyName][date]) timetableDetails[facultyName][date] = {};
+                            timetableDetails[facultyName][date][time] = roomDetails;
+                        });
+
+                        const sortedDates = Array.from(allDates).sort();
+                        const sortedTimes = Array.from(allTimes).sort();
+                        const sortedFaculty = Array.from(allFaculty).sort();
+
+                        return (
+                            <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: '8px', overflow: 'auto', mt: 2 }}>
+                                <Table size="small">
+                                    <TableHead sx={{ bgcolor: 'primary.main' }}>
+                                        <TableRow>
+                                            <TableCell
+                                                rowSpan={2}
+                                                sx={{ fontWeight: 'bold', color: 'white', width: 180, border: '1px solid #ccc', textAlign: 'center' }}
+                                            >
+                                                Staff Name
+                                            </TableCell>
+                                            {sortedDates.map(date => (
+                                                <TableCell
+                                                    key={date}
+                                                    colSpan={sortedTimes.length}
+                                                    align="center"
+                                                    sx={{ fontWeight: 'bold', color: 'white', border: '1px solid #ccc' }}
+                                                >
+                                                    {date}
+                                                </TableCell>
+                                            ))}
+                                        </TableRow>
+                                        <TableRow>
+                                            {sortedDates.map(() =>
+                                                sortedTimes.map(time => (
+                                                    <TableCell
+                                                        key={time + Math.random()}
+                                                        align="center"
+                                                        sx={{ fontWeight: 'bold', color: 'white', fontSize: '11px' , border: '1px solid #ccc'}}
+                                                    >
+                                                        {time}
+                                                    </TableCell>
+                                                ))
+                                            )}
+                                        </TableRow>
+                                    </TableHead>
+                                    <TableBody>
+                                        {sortedFaculty.map(faculty => (
+                                            <TableRow key={faculty}>
+                                                <TableCell sx={{ fontWeight: 'bold', border: '1px solid #ccc',textAlign: 'center'  }}>{faculty}</TableCell>
+                                                {sortedDates.map(date =>
+                                                    sortedTimes.map(time => {
+                                                        const roomInfo = timetableDetails?.[faculty]?.[date]?.[time] || "";
+                                                        return (
+                                                            <TableCell key={`${faculty}-${date}-${time}`} align="center" sx={{ border: '1px solid #ccc' }}>
+                                                                {roomInfo}
+                                                            </TableCell>
+                                                        );
+                                                    })
+                                                )}
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </TableContainer>
+                        );
+                    })()}
+
+
+
                     <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 3 }}>
                         <Button
                             variant="contained"

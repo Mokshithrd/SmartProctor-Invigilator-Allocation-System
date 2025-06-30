@@ -2,6 +2,12 @@
 
 A full-stack web application built using the **MERN Stack** and **Tailwind CSS** for automating the process of allocating exam halls, invigilators, and students efficiently.
 
+## 📽️ Demo
+
+<video src="demo.mp4" controls width="600"></video>
+
+[Click here to download and view the demo](demo.mp4)
+
 ## 🛠️ Tech Stack
 
 - **Frontend**: React.js, Tailwind CSS
@@ -17,5 +23,4 @@ A full-stack web application built using the **MERN Stack** and **Tailwind CSS**
 - 🗓️ **Dynamic Exam Scheduling** and student mapping
 - 🔐 **JWT Authentication**
 - 📁 **Mongoose Schemas** to model Users, Exams, Rooms, and Allocations
-
 
