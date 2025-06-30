@@ -2,12 +2,9 @@
 
 A full-stack web application built using the **MERN Stack** and **Tailwind CSS** for automating the process of allocating exam halls, invigilators, and students efficiently.
 
-## 📽️ Demo
+## Demo
 
 [![Watch the Demo Video](https://img.youtube.com/vi/3LtOTduAXm4/0.jpg)](https://youtu.be/3LtOTduAXm4)
-
-🎬 [Click here to watch on YouTube](https://youtu.be/3LtOTduAXm4)
-
 
 ## 🛠️ Tech Stack
 
