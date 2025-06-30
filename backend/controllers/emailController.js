@@ -16,6 +16,9 @@ const formatTime12Hour = (timeStr) => {
     });
 };
 
+// Delay function to pause between emails
+const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
 exports.sendFacultyEmailsForExam = async (req, res) => {
     const { examId } = req.params;
 
@@ -51,10 +54,9 @@ exports.sendFacultyEmailsForExam = async (req, res) => {
             });
         });
 
-        // Send email to each faculty
-        const emailPromises = Object.entries(facultyMap).map(async ([email, { name, allocations }]) => {
+        // Send email to each faculty with delay
+        for (const [email, { name, allocations }] of Object.entries(facultyMap)) {
             let text = `Hello ${name},\n\nYou have been assigned for the exam "${exam.name}" (Semester: ${exam.sem}).\n\nHere are your invigilation details:\n\n`;
-
 
             allocations.forEach((a, i) => {
                 const formattedStart = formatTime12Hour(a.startTime);
@@ -65,10 +67,11 @@ exports.sendFacultyEmailsForExam = async (req, res) => {
 
             text += "Please be present at your assigned room 10 minutes before the scheduled time.\n\nRegards,\nExam Cell";
 
-            return sendEmail(email, `Invigilation Details for ${exam.name}`, text);
-        });
+            await sendEmail(email, `Invigilation Details for ${exam.name}`, text);
 
-        await Promise.all(emailPromises);
+            // Wait 1.5 seconds to avoid Google rate limiting
+            await delay(30);
+        }
 
         return res.status(200).json({ success: true, message: "Emails sent successfully" });
     } catch (error) {

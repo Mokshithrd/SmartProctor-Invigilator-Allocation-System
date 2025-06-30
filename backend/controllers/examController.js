@@ -26,15 +26,15 @@ exports.createExam = async (req, res) => {
 
         // Validate semesterData (up to 2 semesters)
         if (semesterData.length > 2) {
-            return res.status(400).json({ 
-                success: false, 
-                message: "System can handle maximum 2 semesters at a time." 
+            return res.status(400).json({
+                success: false,
+                message: "System can handle maximum 2 semesters at a time."
             });
         }
 
         // Validate each semester's data
         for (let semData of semesterData) {
-            if (!semData.semester || !semData.totalStudents || 
+            if (!semData.semester || !semData.totalStudents ||
                 !Array.isArray(semData.subjects) || semData.subjects.length === 0) {
                 return res.status(400).json({
                     success: false,
@@ -44,7 +44,7 @@ exports.createExam = async (req, res) => {
 
             // Validate each subject
             for (let subject of semData.subjects) {
-                if (!subject.name || !subject.subjectCode || !subject.date || 
+                if (!subject.name || !subject.subjectCode || !subject.date ||
                     !subject.startTime || !subject.endTime) {
                     return res.status(400).json({
                         success: false,
@@ -147,7 +147,7 @@ exports.createExam = async (req, res) => {
 
         for (let subject of allSubjectsWithSemInfo) {
             const key = `${subject.date}_${subject.startTime}_${subject.endTime}`;
-            
+
             if (subjectTimingsMap.has(key)) {
                 const existingCount = subjectTimingsMap.get(key);
                 subjectTimingsMap.set(key, existingCount + subject.totalStudents);
@@ -159,7 +159,7 @@ exports.createExam = async (req, res) => {
         // Now check availability for each unique timing with the appropriate student count
         for (let [key, totalStudents] of subjectTimingsMap.entries()) {
             const [date, startTime, endTime] = key.split('_');
-            
+
             const availability = await RoomAllocator.checkRoomAvailability(
                 rooms,
                 date,
@@ -187,12 +187,12 @@ exports.createExam = async (req, res) => {
             faculty: [],
             subjects: []
         });
-        
+
         await newExam.save({ session });
-        
+
         // Create Subject documents for all semesters
         const subjectDocs = [];
-        
+
         for (let semData of semesterData) {
             // Create Subject documents for this semester
             const semesterSubjects = await Subject.insertMany(
@@ -207,24 +207,24 @@ exports.createExam = async (req, res) => {
                 })),
                 { session }
             );
-            
+
             subjectDocs.push(...semesterSubjects);
         }
-        
+
         // Update exam with subject IDs
         newExam.subjects = subjectDocs.map(s => s._id);
         await newExam.save({ session });
 
         // Group subjects by date and time to identify overlapping exams
         const dateTimeSubjectMap = new Map();
-        
+
         for (let subject of subjectDocs) {
             const key = `${moment(subject.date).format('YYYY-MM-DD')}_${subject.startTime}_${subject.endTime}`;
-            
+
             if (!dateTimeSubjectMap.has(key)) {
                 dateTimeSubjectMap.set(key, []);
             }
-            
+
             dateTimeSubjectMap.get(key).push(subject);
         }
 
@@ -233,16 +233,16 @@ exports.createExam = async (req, res) => {
         // Allocate rooms for each time slot
         for (let [dateTimeKey, subjectsAtTime] of dateTimeSubjectMap.entries()) {
             const [date, startTime, endTime] = dateTimeKey.split('_');
-            
+
             // If we have overlapping subjects from different semesters
-            if (subjectsAtTime.length > 1 && 
+            if (subjectsAtTime.length > 1 &&
                 new Set(subjectsAtTime.map(s => s.semester)).size > 1) {
-                
+
                 // Create allocation data for multi-semester allocation
                 const semesterData = subjectsAtTime.map(subject => {
                     // Find the corresponding semester data from the exam
                     const semesterInfo = newExam.semesters.find(sem => sem.semester === subject.semester);
-                    
+
                     return {
                         examId: newExam._id,
                         subjectId: subject._id,
@@ -250,7 +250,7 @@ exports.createExam = async (req, res) => {
                         semester: subject.semester
                     };
                 });
-                
+
                 // Call multi-semester room allocation
                 const result = await RoomAllocator.allocateMultiSemesterToRooms(
                     semesterData,
@@ -260,21 +260,21 @@ exports.createExam = async (req, res) => {
                     endTime,
                     session
                 );
-                
+
                 if (!result.success) {
                     await session.abortTransaction();
                     session.endSession();
                     return res.status(400).json(result);
                 }
-                
+
                 result.allocations.forEach(alloc => allocatedRoomIds.add(alloc.roomId.toString()));
-                
+
             } else {
                 // Single semester subject allocation
                 const subject = subjectsAtTime[0];
                 // Find the corresponding semester data from the exam
                 const semesterInfo = newExam.semesters.find(sem => sem.semester === subject.semester);
-                
+
                 const result = await RoomAllocator.allocateStudentsToRooms(
                     newExam._id,
                     subject._id,
@@ -286,13 +286,13 @@ exports.createExam = async (req, res) => {
                     subject.semester, // Pass semester number
                     session
                 );
-                
+
                 if (!result.success) {
                     await session.abortTransaction();
                     session.endSession();
                     return res.status(400).json(result);
                 }
-                
+
                 result.allocations.forEach(alloc => allocatedRoomIds.add(alloc.roomId.toString()));
             }
         }
@@ -300,20 +300,20 @@ exports.createExam = async (req, res) => {
         // Update exam with room info
         newExam.rooms = [...allocatedRoomIds];
         await newExam.save({ session });
-        
+
         // Allocate faculty for the exam
         const facultyResult = await FacultyAllocator.allocateFacultyToRooms(
             newExam._id,
             faculty,
             session
         );
-        
+
         if (!facultyResult.success) {
             await session.abortTransaction();
             session.endSession();
             return res.status(400).json(facultyResult);
         }
-        
+
         const uniqueFacultyIds = [
             ...new Set(facultyResult.allocations.map(a => a.facultyId.toString()))
         ];
@@ -445,7 +445,7 @@ exports.getAllExams = async (req, res) => {
                 // Group subjects by semester
                 const subjectsBySemester = {};
                 const semesterStudentCounts = {};
-                
+
                 // Initialize semester student counts from exam.semesters
                 if (exam.semesters && exam.semesters.length > 0) {
                     exam.semesters.forEach(sem => {
@@ -453,7 +453,7 @@ exports.getAllExams = async (req, res) => {
                         subjectsBySemester[sem.semester] = [];
                     });
                 }
-                
+
                 // Group subjects by their semester
                 exam.subjects.forEach(subject => {
                     if (!subjectsBySemester[subject.semester]) {
@@ -468,7 +468,7 @@ exports.getAllExams = async (req, res) => {
                         endTime: subject.endTime
                     });
                 });
-                
+
                 // Calculate start and end dates for each semester
                 const semesterDateRanges = {};
                 Object.keys(subjectsBySemester).forEach(semester => {
@@ -481,12 +481,12 @@ exports.getAllExams = async (req, res) => {
                         };
                     }
                 });
-                
+
                 // Calculate overall exam date range
                 const allDates = exam.subjects.map(s => moment(s.date));
                 const examStartDate = moment.min(allDates).toDate();
                 const examEndDate = moment.max(allDates).toDate();
-                
+
                 return {
                     _id: exam._id,
                     name: exam.name,
@@ -530,190 +530,198 @@ exports.getAllExams = async (req, res) => {
 
 
 exports.getExamById = async (req, res) => {
-  try {
-    // Fetch the exam details from the database
-    const exam = await Exam.findById(req.params.id)
-      .populate('rooms')
-      .populate('faculty')
-      .populate({
-        path: 'subjects',
-        options: { sort: { semester: 1, date: 1 } }
-      });
+    try {
+        // Fetch the exam details from the database
+        const exam = await Exam.findById(req.params.id)
+            .populate('rooms')
+            .populate('faculty')
+            .populate({
+                path: 'subjects',
+                options: { sort: { semester: 1, date: 1 } }
+            });
 
-    // If no exam is found, return a 404 error
-    if (!exam) {
-      return res.status(404).json({ success: false, message: 'Exam not found' });
-    }
-
-    // Get faculty allocations for this exam
-    const facultyAllocations = await Allocation.find({ examId: req.params.id })
-      .populate('roomId', 'roomNumber building floor capacity')
-      .populate('facultyId', 'name designation')
-      .populate('subjectId', 'name subjectCode semester');
-
-    // Get room allocations for this exam
-    const roomAllocations = await RoomAllocation.find({ examId: req.params.id })
-      .populate('roomId', 'roomNumber building floor capacity')
-      .populate('subjectId', 'name subjectCode semester date startTime endTime')
-      .lean();
-
-    // Format the rooms
-    const formattedRooms = exam.rooms.map(room => ({
-      _id: room._id,
-      roomNumber: room.roomNumber,
-      building: room.building,
-      floor: room.floor,
-      capacity: room.capacity
-    }));
-
-    // Format the faculty allocations (table format as shown in Image 2)
-    const formattedFacultyAllocations = facultyAllocations.map(alloc => {
-      const dateObj = new Date(alloc.date);
-      const formattedDate = dateObj.toISOString().split('T')[0]; // YYYY-MM-DD
-      
-      return {
-        facultyName: `${alloc.facultyId.name} (${alloc.facultyId.designation})`,
-        date: formattedDate,
-        time: `${alloc.startTime} - ${alloc.endTime}`,
-        roomDetails: alloc.roomId ? 
-          `${alloc.roomId.building}, ${alloc.roomId.roomNumber}, ${alloc.roomId.floor} Floor` : 
-          'Not assigned'
-      };
-    });
-
-    // Organize subjects by semester
-    const subjectsBySemester = {};
-    if (exam.subjects && exam.subjects.length > 0) {
-      exam.subjects.forEach(subject => {
-        const semester = subject.semester;
-        if (!subjectsBySemester[semester]) {
-          subjectsBySemester[semester] = [];
+        // If no exam is found, return a 404 error
+        if (!exam) {
+            return res.status(404).json({ success: false, message: 'Exam not found' });
         }
-        
-        const dateObj = new Date(subject.date);
-        const formattedDate = dateObj.toISOString().split('T')[0]; // YYYY-MM-DD
-        
-        subjectsBySemester[semester].push({
-          name: subject.name,
-          subjectCode: subject.subjectCode,
-          date: formattedDate,
-          time: `${subject.startTime} - ${subject.endTime}`
-        });
-      });
-    }
 
-    // Process student allocations by semester
-    const studentAllocationsBySemester = {};
-    
-    if (roomAllocations && roomAllocations.length > 0) {
-      // Track unique room-semester combinations to avoid duplicates
-      const processedRooms = new Map();
-      
-      for (const roomAlloc of roomAllocations) {
-        // Get all students in this room allocation
-        const students = roomAlloc.students || [];
-        
-        // Group students by semester
-        const studentsBySemester = {};
-        
-        students.forEach(studentId => {
-          // Check if the student ID contains semester info (format: "Sem2-Student91")
-          const semMatch = studentId.match(/Sem(\d+)-Student(\d+)/i);
-          
-          if (semMatch) {
-            const semester = parseInt(semMatch[1]);
-            const studentNumber = parseInt(semMatch[2]);
-            
-            if (!studentsBySemester[semester]) {
-              studentsBySemester[semester] = [];
-            }
-            
-            studentsBySemester[semester].push(studentNumber);
-          }
+        // Get faculty allocations for this exam
+        const facultyAllocations = await Allocation.find({ examId: req.params.id })
+            .populate('roomId', 'roomNumber building floor capacity')
+            .populate('facultyId', 'name designation')
+            .populate('subjectId', 'name subjectCode semester');
+
+        // Get room allocations for this exam
+        const roomAllocations = await RoomAllocation.find({ examId: req.params.id })
+            .populate('roomId', 'roomNumber building floor capacity')
+            .populate('subjectId', 'name subjectCode semester date startTime endTime')
+            .lean();
+
+        // Format the rooms
+        const formattedRooms = exam.rooms.map(room => ({
+            _id: room._id,
+            roomNumber: room.roomNumber,
+            building: room.building,
+            floor: room.floor,
+            capacity: room.capacity
+        }));
+
+        // Format the faculty allocations (table format as shown in Image 2)
+        const formattedFacultyAllocations = facultyAllocations.map(alloc => {
+            const dateObj = new Date(alloc.date);
+            const formattedDate = dateObj.toISOString().split('T')[0]; // YYYY-MM-DD
+
+            return {
+                facultyName: `${alloc.facultyId.name}`,
+                date: formattedDate,
+                time: `${alloc.startTime} - ${alloc.endTime}`,
+                roomDetails: alloc.roomId ?
+                    `${alloc.roomId.building}, ${alloc.roomId.roomNumber}, ${alloc.roomId.floor} Floor` :
+                    'Not assigned'
+            };
         });
-        
-        // Process each semester's students separately
-        for (const [semester, semesterStudents] of Object.entries(studentsBySemester)) {
-          if (!studentAllocationsBySemester[semester]) {
-            studentAllocationsBySemester[semester] = [];
-          }
-          
-          // Create unique key for this room-semester combination
-          const roomKey = `${roomAlloc.roomId._id}-${semester}`;
-          
-          // Skip if we've already processed this room for this semester
-          if (processedRooms.has(roomKey)) {
-            continue;
-          }
-          
-          processedRooms.set(roomKey, true);
-          
-          // Sort students by number
-          const sortedStudents = [...semesterStudents].sort((a, b) => a - b);
-          
-          // Create student ranges
-          let currentRange = {
-            start: sortedStudents[0],
-            end: sortedStudents[0],
-            count: 1
-          };
-          
-          const studentRanges = [];
-          for (let i = 1; i < sortedStudents.length; i++) {
-            const current = sortedStudents[i];
-            const prev = sortedStudents[i-1];
-            
-            if (current === prev + 1) {
-              currentRange.end = current;
-              currentRange.count++;
-            } else {
-              studentRanges.push(currentRange);
-              currentRange = {
-                start: current,
-                end: current,
-                count: 1
-              };
-            }
-          }
-          
-          // Add the last range
-          studentRanges.push(currentRange);
-          
-          // Format ranges as table format shown in Image 1
-          const formattedRange = {
-            studentRange: `${currentRange.start} - ${currentRange.end}`,
-            count: currentRange.count,
-            roomDetails: `${roomAlloc.roomId.building}, ${roomAlloc.roomId.roomNumber}, ${roomAlloc.roomId.floor} Floor`
-          };
-          
-          studentAllocationsBySemester[semester].push(formattedRange);
+
+        // Organize subjects by semester
+        const subjectsBySemester = {};
+        if (exam.subjects && exam.subjects.length > 0) {
+            exam.subjects.forEach(subject => {
+                const semester = subject.semester;
+                if (!subjectsBySemester[semester]) {
+                    subjectsBySemester[semester] = [];
+                }
+
+                const dateObj = new Date(subject.date);
+                const formattedDate = dateObj.toISOString().split('T')[0]; // YYYY-MM-DD
+
+                subjectsBySemester[semester].push({
+                    name: subject.name,
+                    subjectCode: subject.subjectCode,
+                    date: formattedDate,
+                    time: `${subject.startTime} - ${subject.endTime}`
+                });
+            });
         }
-      }
+
+        // Process student allocations by semester
+        const studentAllocationsBySemester = {};
+
+        if (roomAllocations && roomAllocations.length > 0) {
+            // Track unique room-semester combinations to avoid duplicates
+            const processedRooms = new Map();
+
+            for (const roomAlloc of roomAllocations) {
+                // Get all students in this room allocation
+                const students = roomAlloc.students || [];
+
+                // Group students by semester
+                const studentsBySemester = {};
+
+                students.forEach(studentId => {
+                    // Check if the student ID contains semester info (format: "Sem2-Student91")
+                    const semMatch = studentId.match(/Sem(\d+)-Student(\d+)/i);
+
+                    if (semMatch) {
+                        const semester = parseInt(semMatch[1]);
+                        const studentNumber = parseInt(semMatch[2]);
+
+                        if (!studentsBySemester[semester]) {
+                            studentsBySemester[semester] = [];
+                        }
+
+                        studentsBySemester[semester].push(studentNumber);
+                    }
+                });
+
+                // Process each semester's students separately
+                for (const [semester, semesterStudents] of Object.entries(studentsBySemester)) {
+                    if (!studentAllocationsBySemester[semester]) {
+                        studentAllocationsBySemester[semester] = [];
+                    }
+
+                    // Create unique key for this room-semester combination
+                    const roomKey = `${roomAlloc.roomId._id}-${semester}`;
+
+                    // Skip if we've already processed this room for this semester
+                    if (processedRooms.has(roomKey)) {
+                        continue;
+                    }
+
+                    processedRooms.set(roomKey, true);
+
+                    // Sort students by number
+                    const sortedStudents = [...semesterStudents].sort((a, b) => a - b);
+
+                    // Create student ranges
+                    let currentRange = {
+                        start: sortedStudents[0],
+                        end: sortedStudents[0],
+                        count: 1
+                    };
+
+                    const studentRanges = [];
+                    for (let i = 1; i < sortedStudents.length; i++) {
+                        const current = sortedStudents[i];
+                        const prev = sortedStudents[i - 1];
+
+                        if (current === prev + 1) {
+                            currentRange.end = current;
+                            currentRange.count++;
+                        } else {
+                            studentRanges.push(currentRange);
+                            currentRange = {
+                                start: current,
+                                end: current,
+                                count: 1
+                            };
+                        }
+                    }
+
+                    // Add the last range
+                    studentRanges.push(currentRange);
+
+                    // Format ranges as table format shown in Image 1
+                    const formattedRange = {
+                        studentRange: `${currentRange.start} - ${currentRange.end}`,
+                        count: currentRange.count,
+                        roomDetails: `${roomAlloc.roomId.building}, ${roomAlloc.roomId.roomNumber}, ${roomAlloc.roomId.floor} Floor`
+                    };
+
+                    studentAllocationsBySemester[semester].push(formattedRange);
+                }
+            }
+        }
+
+        for (const semester in studentAllocationsBySemester) {
+            studentAllocationsBySemester[semester].sort((a, b) => {
+                const aStart = parseInt(a.studentRange.split(' - ')[0]);
+                const bStart = parseInt(b.studentRange.split(' - ')[0]);
+                return aStart - bStart;
+            });
+        }
+
+        // Prepare response data with the format you requested
+        const formattedExam = {
+            _id: exam._id,
+            name: exam.name,
+            year: exam.year,
+            semesters: exam.semesters.map(sem => ({
+                semester: sem.semester,
+                totalStudents: sem.totalStudents
+            })),
+            rooms: formattedRooms,
+            facultyAllocations: formattedFacultyAllocations,
+            subjectsBySemester: subjectsBySemester,
+            studentAllocationsBySemester: studentAllocationsBySemester
+        };
+
+        // Return the formatted exam details
+        return res.status(200).json({
+            success: true,
+            exam: formattedExam
+        });
+
+    } catch (err) {
+        console.error("Error fetching exam by ID:", err);
+        return res.status(500).json({ success: false, message: 'Error fetching exam details' });
     }
-
-    // Prepare response data with the format you requested
-    const formattedExam = {
-      _id: exam._id,
-      name: exam.name,
-      year: exam.year,
-      semesters: exam.semesters.map(sem => ({
-        semester: sem.semester,
-        totalStudents: sem.totalStudents
-      })),
-      rooms: formattedRooms,
-      facultyAllocations: formattedFacultyAllocations,
-      subjectsBySemester: subjectsBySemester,
-      studentAllocationsBySemester: studentAllocationsBySemester
-    };
-
-    // Return the formatted exam details
-    return res.status(200).json({ 
-      success: true, 
-      exam: formattedExam 
-    });
-    
-  } catch (err) {
-    console.error("Error fetching exam by ID:", err);
-    return res.status(500).json({ success: false, message: 'Error fetching exam details' });
-  }
 };

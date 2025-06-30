@@ -52,47 +52,47 @@ exports.exportStudentAllotmentPDF = async (req, res) => {
 
             // Process students grouped by semester
             const studentsBySemester = {};
-            
+
             alloc.students.forEach(studentId => {
                 // Check if the student ID contains semester info (format: "Sem2-Student91")
                 const semMatch = studentId.match(/Sem(\d+)-Student(\d+)/i);
-                
+
                 if (semMatch) {
                     const semester = parseInt(semMatch[1]);
                     const studentNumber = parseInt(semMatch[2]);
-                    
+
                     if (!studentsBySemester[semester]) {
                         studentsBySemester[semester] = [];
                     }
-                    
+
                     studentsBySemester[semester].push(studentNumber);
                 }
             });
-            
+
             // Process each semester's students separately
             for (const [semester, semesterStudents] of Object.entries(studentsBySemester)) {
                 if (!studentAllocationsBySemester[semester]) {
                     studentAllocationsBySemester[semester] = [];
                 }
-                
+
                 // Create unique key for this room-semester combination
                 const roomKey = `${room._id}-${semester}`;
-                
+
                 // Skip if we've already processed this room for this semester
                 if (processedRooms.has(roomKey)) {
                     continue;
                 }
-                
+
                 processedRooms.set(roomKey, true);
-                
+
                 if (semesterStudents.length === 0) continue;
-                
+
                 // Sort students numerically
                 const sortedStudents = [...semesterStudents].sort((a, b) => a - b);
-                
+
                 const rangeStart = sortedStudents[0];
                 const rangeEnd = sortedStudents[sortedStudents.length - 1];
-                
+
                 studentAllocationsBySemester[semester].push({
                     studentRange: `${rangeStart} - ${rangeEnd}`,
                     rangeStart: rangeStart,
@@ -105,7 +105,7 @@ exports.exportStudentAllotmentPDF = async (req, res) => {
                 });
             }
         }
-        
+
         // Sort each semester's allocations by range start
         Object.keys(studentAllocationsBySemester).forEach(semester => {
             studentAllocationsBySemester[semester].sort((a, b) => a.rangeStart - b.rangeStart);
@@ -163,7 +163,7 @@ exports.exportStudentAllotmentPDF = async (req, res) => {
         // Add each semester's table with page breaks between them
         sortedSemesters.forEach((semester, index) => {
             const allocations = studentAllocationsBySemester[semester];
-            
+
             htmlContent += `
             <div${index > 0 ? ' class="page-break"' : ''}>
                 <h2>Student Room Allotments - ${exam.name}</h2>
@@ -200,7 +200,7 @@ exports.exportStudentAllotmentPDF = async (req, res) => {
 
         const page = await browser.newPage();
         await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
-        const pdfBuffer = await page.pdf({ 
+        const pdfBuffer = await page.pdf({
             format: "A4",
             printBackground: true
         });
@@ -219,16 +219,16 @@ exports.exportStudentAllotmentPDF = async (req, res) => {
     }
 };
 
+function getFloorSuffix(floor) {
+    const j = floor % 10, k = floor % 100;
+    if (j === 1 && k !== 11) return `${floor}st`;
+    if (j === 2 && k !== 12) return `${floor}nd`;
+    if (j === 3 && k !== 13) return `${floor}rd`;
+    return `${floor}th`;
+}
+
 exports.exportFacultyAllotmentPDF = async (req, res) => {
     const { examId } = req.params;
-
-    function getFloorSuffix(floor) {
-        const j = floor % 10, k = floor % 100;
-        if (j === 1 && k !== 11) return `${floor}st`;
-        if (j === 2 && k !== 12) return `${floor}nd`;
-        if (j === 3 && k !== 13) return `${floor}rd`;
-        return `${floor}th`;
-    }
 
     if (!mongoose.Types.ObjectId.isValid(examId)) {
         return res.status(400).json({ success: false, message: "Invalid examId" });
@@ -244,89 +244,91 @@ exports.exportFacultyAllotmentPDF = async (req, res) => {
             .populate("facultyId", "name designation")
             .populate("roomId", "roomNumber building floor");
 
-        const facultyRoomAllotments = allocations.map((a) => {
-            const room = a.roomId;
+        // Preprocess into a matrix structure: { date: { time: { facultyName: true } } }
+        const timetable = {};
+        const allTimes = new Set();
+        const allFaculty = new Set();
+        const timetableDetails = {};
+
+        allocations.forEach(a => {
             const faculty = a.facultyId;
-            return {
-                facultyName: faculty
-                    ? `${faculty.name}${faculty.designation ? ` (${faculty.designation})` : ""}`
-                    : "Unknown Faculty",
-                date: moment(a.date).format("YYYY-MM-DD"),
-                time: `${convertTo12Hour(a.startTime)} - ${convertTo12Hour(a.endTime)}`,
-                room: room ? {
-                    building: room.building,
-                    roomNumber: room.roomNumber,
-                    floor: getFloorSuffix(room.floor)
-                } : {}
-            };
+            const facultyName = faculty ? faculty.name : "Unknown Faculty";
+            allFaculty.add(facultyName);
+
+            const date = moment(a.date).format("YYYY-MM-DD");
+            const time = `${convertTo12Hour(a.startTime)} - ${convertTo12Hour(a.endTime)}`;
+            const room = a.roomId
+                ? `${a.roomId.building}, ${a.roomId.roomNumber}, ${getFloorSuffix(a.roomId.floor)} Floor`
+                : "";
+
+            // for star matrix
+            if (!timetable[date]) timetable[date] = {};
+            if (!timetable[date][time]) timetable[date][time] = {};
+            timetable[date][time][facultyName] = true;
+
+            // for room matrix
+            if (!timetableDetails[date]) timetableDetails[date] = {};
+            if (!timetableDetails[date][time]) timetableDetails[date][time] = {};
+            timetableDetails[date][time][facultyName] = room;
+
+            allTimes.add(time);
         });
 
-        facultyRoomAllotments.sort((a, b) => {
-            const dateTimeA = new Date(`${a.date}T${a.time.split(" - ")[0]}`);
-            const dateTimeB = new Date(`${b.date}T${b.time.split(" - ")[0]}`);
-            return dateTimeA - dateTimeB;
-        });
+        const sortedDates = Object.keys(timetable).sort();
+        const sortedTimes = Array.from(allTimes).sort();
+        const sortedFaculty = Array.from(allFaculty).sort();
 
-        const htmlContent = `
+        // Build HTML table
+        let htmlContent = `
         <!DOCTYPE html>
         <html>
         <head>
             <style>
-                body {
-                    font-family: Arial, sans-serif;
-                    padding: 20px;
-                }
-                h2 {
-                    text-align: center;
-                    margin-bottom: 30px;
-                }
-                table {
-                    border-collapse: collapse;
-                    width: 100%;
-                    font-size: 14px;
-                }
-                th, td {
-                    border: 1px solid #999;
-                    padding: 10px;
-                    text-align: center;
-                }
-                th {
-                    background-color: #f0f0f0;
-                }
-                tr:nth-child(even) {
-                    background-color: #f9f9f9;
-                }
-                tr:nth-child(odd) {
-                    background-color: #ffffff;
-                }
+                body { font-family: Arial, sans-serif; padding: 20px; font-size: 12px; }
+                h2 { text-align: center; margin-bottom: 10px; }
+                h3 { margin-top: 40px; text-align: center; }
+                table { border-collapse: collapse; width: 100%; margin-top: 10px; }
+                th, td { border: 1px solid #000; padding: 5px; text-align: center; }
+                th { background-color: #eee; }
+                td.star { font-weight: bold; font-size: 14px; }
+                .staff-name { width: 160px; text-align: center; padding-left: 8px; }
+                .small-font { font-size: 10px; }
             </style>
         </head>
         <body>
-            <h2>Faculty Room Allotments - ${exam.name}</h2>
-            <table>
+
+            <h2>Faculty Duty Allotment - ${exam.name}</h2>
+
+            <table class="small-font">
                 <thead>
                     <tr>
-                        <th>Faculty Name</th>
-                        <th>Date</th>
-                        <th>Time</th>
-                        <th>Room Details</th>
+                        <th class="staff-name" rowspan="2">Staff Name</th>
+                        ${sortedDates.map(date => `<th colspan="${sortedTimes.length}">${date}</th>`).join('')}
+                    </tr>
+                    <tr>
+                        ${sortedDates.map(() =>
+                        sortedTimes.map(time => `<th>${time}</th>`).join('')
+                        ).join('')}
                     </tr>
                 </thead>
                 <tbody>
-                    ${facultyRoomAllotments.map(r => `
-                    <tr>
-                        <td>${r.facultyName}</td>
-                        <td>${r.date}</td>
-                        <td>${r.time}</td>
-                        <td>${r.room.building}, ${r.room.roomNumber}, ${r.room.floor} Floor
-                        </td>
-                    </tr>
-                    `).join('')}
-                </tbody>
+                    ${sortedFaculty.map(faculty => {
+                            return `<tr>
+                        <td class="staff-name">${faculty}</td>
+                        ${sortedDates.map(date =>
+                                sortedTimes.map(time => {
+                                    const roomInfo = timetableDetails?.[date]?.[time]?.[faculty] || "";
+                                    return `<td>${roomInfo}</td>`;
+                                }).join('')
+                            ).join('')}
+                        </tr>`;
+                        }).join('')}
+                    </tbody>
             </table>
+
         </body>
         </html>
-        `;
+`;
 
         const browser = await puppeteer.launch({
             headless: "new",
@@ -334,18 +336,18 @@ exports.exportFacultyAllotmentPDF = async (req, res) => {
         });
         const page = await browser.newPage();
         await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
-        const pdfBuffer = await page.pdf({ format: "A4" });
+        const pdfBuffer = await page.pdf({ format: "A4", landscape: true, printBackground: true });
         await browser.close();
 
         res.writeHead(200, {
             'Content-Type': 'application/pdf',
-            'Content-Disposition': `attachment; filename=faculty_allotments_${exam.name}.pdf`,
+            'Content-Disposition': `attachment; filename=faculty_matrix_${exam.name}.pdf`,
             'Content-Length': pdfBuffer.length
         });
         res.end(pdfBuffer);
 
     } catch (err) {
-        console.error("Error generating faculty allotment PDF:", err);
+        console.error("Error generating faculty matrix PDF:", err);
         res.status(500).json({ success: false, message: "Failed to generate PDF" });
     }
 };
