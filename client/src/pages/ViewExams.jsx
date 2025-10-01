@@ -22,7 +22,7 @@ const ViewExams = () => {
     setLoading(true);
     setError(null);
     axios
-      .get("http://smartproctor-mokshith.onrender.com/exams/", { withCredentials: true })
+      .get("https://smartproctor-mokshith.onrender.com/exams/", { withCredentials: true })
       .then((response) => {
         if (!response.data.success) {
           throw new Error("Failed to load exams");
@@ -53,7 +53,7 @@ const ViewExams = () => {
       return; // User cancelled deletion
     }
     axios
-      .delete(`http://smartproctor-mokshith.onrender.com/exams/delete/${examId}`, { withCredentials: true })
+      .delete(`https://smartproctor-mokshith.onrender.com/exams/delete/${examId}`, { withCredentials: true })
       .then(() => {
         alert("Exam deleted successfully!");
         fetchExams(); // Refresh the list after successful deletion
