@@ -39,7 +39,7 @@ export default function FacultyDashboard() {
           },
         };
 
-        const response = await axios.get("/faculty/dashboard", config);
+        const response = await axios.get("https://smartproctor-mokshith.onrender.com/faculty/dashboard", config);
 
         if (response.data && response.data.success) {
           const { present, upcoming } = response.data;
@@ -70,7 +70,7 @@ export default function FacultyDashboard() {
           setNotifications(newNotifications);
 
           // Fetch user profile
-          const userResponse = await axios.get("/auth/profile", config);
+          const userResponse = await axios.get("https://smartproctor-mokshith.onrender.com/auth/profile", config);
           if (userResponse.data && userResponse.data.success) {
             setUserData({
               name: userResponse.data.data.name || "Faculty User",
