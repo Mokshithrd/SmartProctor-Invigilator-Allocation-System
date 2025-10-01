@@ -51,7 +51,7 @@ export default function Dashboard({ user }) {
             setError(null);
           }
         } catch (error) {
-          console.error("Error fetching admin dashboard data:", error);
+          console.log("Error fetching admin dashboard data:", error);
           setError("Failed to load dashboard data. Please try again.");
         } finally {
           setLoading(false);
