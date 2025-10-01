@@ -21,7 +21,7 @@ export default function FacultyDetails() {
   useEffect(() => {
     setLoading(true);
     axios
-      .get(`http://smartproctor-mokshith.onrender.com/faculty/${id}`, { withCredentials: true })
+      .get(`https://smartproctor-mokshith.onrender.com/faculty/${id}`, { withCredentials: true })
       .then((res) => {
         setFaculty(res.data.data);
         setLoading(false);
