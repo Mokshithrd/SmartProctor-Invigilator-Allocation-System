@@ -2,7 +2,7 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import axios from "axios";
 
-const API = "http://smartproctor-mokshith.onrender.com/room";
+const API = "https://smartproctor-mokshith.onrender.com/room";
 
 export const fetchRooms = createAsyncThunk("rooms/fetchRooms", async () => {
   const res = await axios.get(`${API}/all`, { withCredentials: true });
