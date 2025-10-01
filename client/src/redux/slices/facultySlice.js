@@ -6,7 +6,7 @@ export const fetchAllFaculties = createAsyncThunk(
   "faculty/fetchAll",
   async (_, { rejectWithValue }) => {
     try {
-      const response = await axios.get("http://localhost:4000/faculty", {
+      const response = await axios.get("http://smartproctor-mokshith.onrender.com/faculty", {
         withCredentials: true,
       });
       return response.data;
