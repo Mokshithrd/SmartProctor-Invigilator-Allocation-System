@@ -47,8 +47,8 @@ exports.login = async (req, res) => {
         // ⚠️ Important: set cookie with correct config
         res.cookie("token", token, {
             httpOnly: true,
-            secure: false, // set to true in production
-            sameSite: "Lax", // "Strict" or "Lax"
+            secure: true, // set to true in production
+            sameSite: "None", // "Strict" or "Lax"
             maxAge: 3 * 60 * 60 * 1000, // 3 hours
         });
 
