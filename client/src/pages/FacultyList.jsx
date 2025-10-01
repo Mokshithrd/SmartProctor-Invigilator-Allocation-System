@@ -17,7 +17,7 @@ export default function FacultyList() {
 
   const fetchFaculties = () => {
     setIsLoading(true);
-    axios.get("http://localhost:4000/faculty/all", { withCredentials: true })
+    axios.get("https://smartproctor-mokshith.onrender.com/faculty/all", { withCredentials: true })
       .then(res => {
         setFaculties(res.data.data);
         setIsLoading(false);
@@ -37,7 +37,7 @@ export default function FacultyList() {
   const handleDelete = async () => {
     setLoading(true);
     try {
-      await axios.delete(`http://localhost:4000/faculty/${deletingId}`, { withCredentials: true });
+      await axios.delete(`https://smartproctor-mokshith.onrender.com/faculty/${deletingId}`, { withCredentials: true });
       setFaculties(prev => prev.filter(f => f._id !== deletingId));
       setShowModal(false);
       setDeletingId(null);
