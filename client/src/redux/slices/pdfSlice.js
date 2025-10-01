@@ -4,7 +4,7 @@ import axios from "axios";
 
 export const fetchPDFs = createAsyncThunk("pdf/fetchPDFs", async (_, { rejectWithValue }) => {
   try {
-    const res = await axios.get("http://smartproctor-mokshith.onrender.com/pdf", { withCredentials: true });
+    const res = await axios.get("https://smartproctor-mokshith.onrender.com/pdf", { withCredentials: true });
     return res.data;
   } catch (error) {
     return rejectWithValue(error.response?.data?.message || error.message);
