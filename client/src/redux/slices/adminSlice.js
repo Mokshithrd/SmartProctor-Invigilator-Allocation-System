@@ -4,7 +4,7 @@ import axios from "axios";
 
 export const fetchAdmins = createAsyncThunk("admin/fetchAdmins", async (_, { rejectWithValue }) => {
   try {
-    const res = await axios.get("http://localhost:4000/admin", { withCredentials: true });
+    const res = await axios.get("http://smartproctor-mokshith.onrender.com/admin", { withCredentials: true });
     return res.data;
   } catch (error) {
     return rejectWithValue(error.response?.data?.message || error.message);
