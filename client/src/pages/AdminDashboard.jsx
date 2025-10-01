@@ -25,7 +25,7 @@ export default function Dashboard({ user }) {
 
   const handleLogout = async () => {
     
-    await axios.post("http://smartproctor-mokshith.onrender.com/auth/logout", {
+    await axios.post("https://smartproctor-mokshith.onrender.com/auth/logout", {
       withCredentials: true,
     });
    
@@ -37,7 +37,7 @@ export default function Dashboard({ user }) {
       const fetchDashboardData = async () => {
         setLoading(true);
         try {
-          const res = await axios.get("http://smartproctor-mokshith.onrender.com/admin/dashboard", {
+          const res = await axios.get("https://smartproctor-mokshith.onrender.com/admin/dashboard", {
             withCredentials: true,
           });
 
