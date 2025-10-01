@@ -53,8 +53,8 @@ const CreateExam = () => {
   useEffect(() => {
     async function fetchData() {
       try {
-        const roomsRes = await axios.get("http://smartproctor-mokshith.onrender.com/room/all", { withCredentials: true });
-        const facultyRes = await axios.get("http://smartproctor-mokshith.onrender.com/faculty/all", { withCredentials: true });
+        const roomsRes = await axios.get("https://smartproctor-mokshith.onrender.com/room/all", { withCredentials: true });
+        const facultyRes = await axios.get("https://smartproctor-mokshith.onrender.com/faculty/all", { withCredentials: true });
 
         setAllRooms(roomsRes.data.data || []);
         setAllFaculty(facultyRes.data.data || []);
