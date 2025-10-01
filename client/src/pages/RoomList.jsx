@@ -51,7 +51,7 @@ export default function RoomList() {
   const fetchRooms = () => {
     setIsLoading(true);
     // Using fetch instead of axios
-    fetch("http://smartproctor-mokshith.onrender.com/room/all", { credentials: "include" })
+    fetch("https://smartproctor-mokshith.onrender.com/room/all", { credentials: "include" })
       .then((res) => res.json())
       .then((data) => {
         setRooms(data.data);
@@ -72,7 +72,7 @@ export default function RoomList() {
     e?.stopPropagation();
     if (!window.confirm("Are you sure you want to delete this room?")) return;
     
-    fetch(`http://smartproctor-mokshith.onrender.com/room/delete/${id}`, {
+    fetch(`https://smartproctor-mokshith.onrender.com/room/delete/${id}`, {
       method: "DELETE",
       credentials: "include"
     })
@@ -105,7 +105,7 @@ export default function RoomList() {
 
   const handleEditSubmit = (id, e) => {
     e?.stopPropagation();
-    fetch(`http://smartproctor-mokshith.onrender.com/room/update/${id}`, {
+    fetch(`https://smartproctor-mokshith.onrender.com/room/update/${id}`, {
       method: "PUT",
       headers: {
         "Content-Type": "application/json"
