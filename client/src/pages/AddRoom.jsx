@@ -60,7 +60,7 @@ export default function AddRoom() {
     setLoading(true);
     
     try {
-      axios.post("http://smartproctor-mokshith.onrender.com/room/add", form, { withCredentials: true })
+      axios.post("https://smartproctor-mokshith.onrender.com/room/add", form, { withCredentials: true })
         .then(() => {
           setStatus({ 
             type: "success", 
