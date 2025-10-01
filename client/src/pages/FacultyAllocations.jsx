@@ -15,7 +15,7 @@ export default function FacultyAllocations() {
 
   const fetchAllocations = () => {
     setLoading(true);
-    axios.get(`http://smartproctor-mokshith.onrender.com/faculty/allocations/${id}`, { withCredentials: true })
+    axios.get(`https://smartproctor-mokshith.onrender.com/faculty/allocations/${id}`, { withCredentials: true })
       .then(res => {
         setAllocData(res.data.data);
         setLoading(false);
