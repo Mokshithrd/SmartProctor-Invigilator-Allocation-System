@@ -3,7 +3,7 @@ import axios from "axios";
 
 export const updateAdminProfile = createAsyncThunk("admin/updateProfile", async (formData, { rejectWithValue }) => {
   try {
-    const res = await axios.put("http://smartproctor-mokshith.onrender.com/admin/update", formData, { withCredentials: true });
+    const res = await axios.put("https://smartproctor-mokshith.onrender.com/admin/update", formData, { withCredentials: true });
     return res.data.message;
   } catch (error) {
     return rejectWithValue(error.response?.data?.message || "Failed to update profile");
