@@ -6,7 +6,7 @@ const storedUser = JSON.parse(localStorage.getItem("user"));
 
 export const fetchUser = createAsyncThunk("user/fetchUser", async (_, { rejectWithValue }) => {
   try {
-    const res = await axios.get("http://smartproctor-mokshith.onrender.com/auth/me", { withCredentials: true });
+    const res = await axios.get("https://smartproctor-mokshith.onrender.com/auth/me", { withCredentials: true });
     return res.data.user;
   } catch (error) {
     return rejectWithValue(error.response?.data?.message || error.message);
