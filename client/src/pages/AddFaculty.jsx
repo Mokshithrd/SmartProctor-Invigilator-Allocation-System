@@ -47,7 +47,7 @@ export default function AddFaculty() {
     setLoading(true);
     
     try {
-      await axios.post("http://localhost:4000/faculty/add", form, { withCredentials: true });
+      await axios.post("http://smartproctor-mokshith.onrender.com/faculty/add", form, { withCredentials: true });
       
       setStatus({ type: "success", message: "Faculty added successfully!" });
       setForm({ name: "", email: "", designation: "" });
