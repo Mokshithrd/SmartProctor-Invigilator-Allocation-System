@@ -14,7 +14,7 @@ const ExamDetail = () => {
     useEffect(() => {
         const fetchExamDetails = async () => {
             try {
-                const response = await axios.get(`http://smartproctor-mokshith.onrender.com/exams/${id}`, { withCredentials: true });
+                const response = await axios.get(`https://smartproctor-mokshith.onrender.com/exams/${id}`, { withCredentials: true });
                 setExam(response.data.exam);
                 setLoading(false);
             } catch (err) {
@@ -30,7 +30,7 @@ const ExamDetail = () => {
         try {
             const endpoint = type === 'faculty' ? `/pdf/faculty-room-pdf/${id}` : `/pdf/student-room-pdf/${id}`;
 
-            const response = await axios.get(`http://smartproctor-mokshith.onrender.com${endpoint}`, {
+            const response = await axios.get(`https://smartproctor-mokshith.onrender.com${endpoint}`, {
                 responseType: 'blob',
                 withCredentials: true,
             });
@@ -55,7 +55,7 @@ const ExamDetail = () => {
             if (!confirmSend) {
                 return;
             }
-            await axios.post(`http://smartproctor-mokshith.onrender.com/admin/send-emails/${id}`, {}, { withCredentials: true });
+            await axios.post(`https://smartproctor-mokshith.onrender.com/admin/send-emails/${id}`, {}, { withCredentials: true });
             alert("Emails sent successfully!");
         } catch (err) {
             console.error("Error sending emails:", err);
