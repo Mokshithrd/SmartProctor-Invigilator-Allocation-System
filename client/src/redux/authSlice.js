@@ -8,7 +8,7 @@ export const fetchAuthStatus = createAsyncThunk(
   'auth/fetchAuthStatus',
   async (_, { rejectWithValue }) => {
     try {
-      const response = await axios.get("http://smartproctor-mokshith.onrender.com/auth/me", { withCredentials: true });
+      const response = await axios.get("https://smartproctor-mokshith.onrender.com/auth/me", { withCredentials: true });
       if (response.data.success) {
         return response.data.user; // Return user object on success
       } else {
@@ -29,7 +29,7 @@ export const loginUser = createAsyncThunk(
   'auth/loginUser',
   async (credentials, { rejectWithValue, dispatch }) => {
     try {
-      const response = await axios.post("http://smartproctor-mokshith.onrender.com/auth/login", credentials, { withCredentials: true });
+      const response = await axios.post("https://smartproctor-mokshith.onrender.com/auth/login", credentials, { withCredentials: true });
       if (response.data.success) {
         toast.success("Login successful!");
         return response.data.user; // Return user object on success
@@ -51,7 +51,7 @@ export const logoutUser = createAsyncThunk(
   'auth/logoutUser',
   async (_, { rejectWithValue }) => {
     try {
-      await axios.post("http://smartproctor-mokshith.onrender.com/auth/logout", {}, { withCredentials: true });
+      await axios.post("https://smartproctor-mokshith.onrender.com/auth/logout", {}, { withCredentials: true });
       toast.success("Logged out successfully!");
       return true; // Indicate successful logout
     } catch (error) {
