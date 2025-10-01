@@ -17,7 +17,7 @@ export const fetchAuthStatus = createAsyncThunk(
       }
     } catch (error) {
       // Handle network errors or non-2xx responses (like 401 Unauthorized)
-      console.error('Error fetching auth status:', error);
+      console.log('Error fetching auth status:', error);
       // For security, do not return sensitive error details directly to user for 401/403
       return rejectWithValue(error.response?.data?.message || 'Failed to authenticate session.');
     }
@@ -39,7 +39,7 @@ export const loginUser = createAsyncThunk(
       }
     } catch (error) {
       const errorMessage = error.response?.data?.message || "An error occurred during login.";
-      console.error('Login error:', error);
+      console.log('Login error:', error);
       toast.error(errorMessage);
       return rejectWithValue(errorMessage);
     }
@@ -55,7 +55,7 @@ export const logoutUser = createAsyncThunk(
       toast.success("Logged out successfully!");
       return true; // Indicate successful logout
     } catch (error) {
-      console.error('Logout error:', error);
+      console.log('Logout error:', error);
       toast.error(error.response?.data?.message || "Logout failed. Please try again.");
       return rejectWithValue(error.response?.data?.message || 'Logout failed.');
     }
