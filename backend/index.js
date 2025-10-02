@@ -19,21 +19,25 @@ const allowedOrigins = [
   "https://smartproctor-invigilator-allocation-3xcm.onrender.com"
 ];
 
-app.use(cors({
-  origin: function(origin, callback) {
-    
-    if (!origin) return callback(null, true);
+const allowedOrigins = [
+  "http://localhost:3000", 
+  "https://smartproctor-invigilator-allocation-3xcm.onrender.com"
+];
 
-    if (allowedOrigins.indexOf(origin) === -1) {
-      const msg = "The CORS policy for this site does not allow access from the specified Origin.";
-      return callback(new Error(msg), false);
+app.use(cors({
+  origin: function (origin, callback) {
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    } else {
+      return callback(new Error("CORS not allowed for this origin: " + origin), false);
     }
-    return callback(null, true);
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],
 }));
+
 
 
 const userRoute = require("./routes/userRoute");
