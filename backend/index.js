@@ -14,10 +14,7 @@ const app = express();
 // Middleware
 app.use(express.json());
 app.use(cookieParser());
-const allowedOrigins = [
-  "http://localhost:3000", 
-  "https://smartproctor-invigilator-allocation-3xcm.onrender.com"
-];
+
 
 const allowedOrigins = [
   "http://localhost:3000", 
